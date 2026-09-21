@@ -1,4 +1,4 @@
-# qplanif+
+# rplanif
 
 Simulador de planificación de CPU para practicar diagramas de Gantt, basado en la
 *Explicación de práctica — Administración de Procesos* (Introducción a los Sistemas
