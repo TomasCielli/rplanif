@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>qplanif+</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>qplanif<span class="plus">+</span></h1>
+    <p>Planificación de CPU · diagrama de Gantt manual y automático</p>
+  </header>
+
+  <main class="layout">
+    <aside class="panel">
+      <section>
+        <h2>1. Procesos</h2>
+        <label class="field">
+          <span>Ejemplos del apunte</span>
+          <select id="preset"></select>
+        </label>
+        <div class="segmented small" role="tablist">
+          <button id="src-table" class="active" role="tab">Tabla</button>
+          <button id="src-code" role="tab">Código</button>
+        </div>
+
+        <div id="table-view">
+          <label class="field">
+            <span>Recursos de E/S (separados por coma)</span>
+            <input type="text" id="resources-input" placeholder="R1, R2">
+          </label>
+          <table class="proc-table" id="proc-table"></table>
+          <button id="btn-add-task" class="wide">+ Agregar proceso</button>
+          <p class="hint">Ráfagas: <code>[CPU,3] [R1,2] [CPU,2]</code> — CPU o nombre/índice del recurso, y duración. Los cambios se aplican al instante y generan el código.</p>
+        </div>
+
+        <div id="code-view" class="hidden">
+          <textarea id="definition" rows="13" spellcheck="false"></textarea>
+          <button id="btn-load" class="primary wide">Cargar código (Ctrl+Enter)</button>
+          <details class="help">
+            <summary>Formato de entrada</summary>
+            <pre>RECURSO ''R1''
+TAREA ''1'' PRIORIDAD=2 INICIO=0
+[CPU,3] [1,2] [CPU,2]</pre>
+            <p><code>[CPU,n]</code> ráfaga de CPU · <code>[k,n]</code> E/S de <em>n</em> instantes en el recurso <em>k</em>-ésimo (o su nombre) · <code>#</code> comentario.</p>
+          </details>
+        </div>
+        <ul id="parse-errors" class="errors"></ul>
+      </section>
+
+      <section>
+        <h2>2. Algoritmo</h2>
+        <label class="field">
+          <span>Política</span>
+          <select id="algorithm"></select>
+        </label>
+        <label class="field" id="quantum-row">
+          <span>Quantum (Q)</span>
+          <input type="number" id="quantum" value="2" min="1">
+        </label>
+        <label class="check" id="preemptive-row">
+          <input type="checkbox" id="preemptive"> Apropiativo (preemptive)
+        </label>
+        <label class="field" id="queues-row">
+          <span>Colas: quantum de cada una, <code>-</code> = FCFS</span>
+          <input type="text" id="queues" value="8,16,-">
+        </label>
+        <label class="field" id="preempted-order-row">
+          <span>Expulsado por quantum, si en ese instante también entran otros a la cola de listos</span>
+          <select id="preempted-order"></select>
+        </label>
+        <p id="algorithm-hint" class="hint"></p>
+      </section>
+
+      <section>
+        <details class="help">
+          <summary>Reglas que aplica el simulador</summary>
+          <ul>
+            <li>▲ marca la llegada del proceso al sistema (INICIO); ▼ marca el instante en que termina por completo. Ambos van sobre la línea de tiempo, no dentro de una celda.</li>
+            <li>Instante <em>t</em> = intervalo [t, t+1). Una ráfaga que termina al final de <em>t</em> deja al proceso listo desde <em>t+1</em>.</li>
+            <li>E/S en paralelo con la CPU. Cada recurso atiende de a uno, con cola FIFO. Si el recurso está ocupado, el proceso <strong>espera bloqueado</strong>.</li>
+            <li>Desempate: orden de llegada al sistema (INICIO), luego PID.</li>
+            <li>RR con <strong>timer variable</strong>: el contador arranca en Q cada vez que un proceso toma la CPU. Si el expulsado por quantum coincide con llegadas o retornos de E/S, se encola según la opción elegida (por defecto: se ordena con ellos por llegada y PID).</li>
+            <li>Prioridades: <strong>menor valor = mayor prioridad</strong>.</li>
+            <li>Los apropiativos (SRTF, Prioridades apropiativo, colas multinivel) sólo expulsan si el candidato es estrictamente mejor; en empate sigue el que está.</li>
+            <li>Multinivel: los procesos entran en Q0; al agotar el quantum bajan una cola. Una cola superior expulsa a una inferior.</li>
+            <li>T<sub>R</sub> = fin − llegada · T<sub>E</sub> = T<sub>R</sub> − T<sub>CPU</sub> (tal como lo define el apunte).</li>
+          </ul>
+        </details>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <div class="toolbar">
+        <div class="segmented" role="tablist">
+          <button id="mode-manual" class="active" role="tab">✏️ Manual</button>
+          <button id="mode-auto" role="tab">⚙️ Automático</button>
+        </div>
+        <div id="manual-tools" class="tools">
+          <span class="tools-label">Pincel:</span>
+          <div id="brushes" class="brushes"></div>
+          <span class="spacer"></span>
+          <button id="btn-check" class="primary">Corregir</button>
+          <button id="btn-solution">Ver solución</button>
+          <button id="btn-clear">Limpiar</button>
+          <button id="btn-more" title="Agregar 5 columnas de tiempo">+5 instantes</button>
+        </div>
+        <div id="auto-tools" class="tools hidden">
+          <button id="btn-run" class="primary">Resolver</button>
+          <button id="btn-copy-manual" title="Copiar la solución al modo manual">Copiar a manual</button>
+        </div>
+      </div>
+
+      <p id="status" class="status"></p>
+      <div id="gantt" class="gantt-wrap"><div class="empty">Cargá los procesos desde el panel de la izquierda.</div></div>
+      <div id="legend" class="legend"></div>
+      <div id="feedback" class="feedback hidden"></div>
+
+      <section class="metrics-box">
+        <h2>Tiempos</h2>
+        <div id="metrics"></div>
+      </section>
+
+      <details id="log-box" class="help hidden">
+        <summary>Log de eventos del simulador</summary>
+        <pre id="log"></pre>
+      </details>
+    </section>
+  </main>
+
+  <script src="js/parser.js"></script>
+  <script src="js/scheduler.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

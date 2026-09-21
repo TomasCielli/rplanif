@@ -1,0 +1,9 @@
+{
+  "name": "qplanif-plus",
+  "version": "1.0.0",
+  "description": "Simulador de planificación de CPU: diagrama de Gantt manual y automático",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/scheduler.test.js"
+  }
+}
