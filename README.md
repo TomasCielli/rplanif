@@ -8,7 +8,9 @@ La idea: **dibujás el diagrama a mano, después lo corregís con el simulador.*
 
 ## Cómo usarlo
 
-Abrí `index.html` en cualquier navegador. No hay que instalar nada.
+**Usalo online: https://tomascielli.github.io/rplanif/** — no hace falta descargar ni
+instalar nada. También podés abrir `index.html` en cualquier navegador, incluso sin
+internet: no usa ninguna librería externa y todo lo que cargues queda en tu navegador.
 
 1. **Procesos**: editá la **tabla** (Job, Llegada, Prio, Ráfagas; agregar / eliminar
    procesos; recursos separados por coma), escribí el **código** con el formato de
@@ -126,3 +128,8 @@ Requiere Node ≥ 18:
 ```
 npm test
 ```
+
+## Autor y licencia
+
+Tomás Cielli Moro — [MIT](LICENSE). Podés usarlo y modificarlo libremente
+manteniendo el aviso de copyright.
