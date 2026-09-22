@@ -1,5 +1,5 @@
 {
-  "name": "qplanif-plus",
+  "name": "rplanif",
   "version": "1.0.0",
   "description": "Simulador de planificación de CPU: diagrama de Gantt manual y automático",
   "private": true,

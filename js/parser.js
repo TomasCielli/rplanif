@@ -1,5 +1,5 @@
 /*
- * qplanif+ — parser del formato de entrada de qplanif.
+ * rplanif — parser del formato de entrada de qplanif.
  *
  *   #Ejemplo 2
  *   RECURSO ''R1''
@@ -15,7 +15,7 @@
  *            (también se acepta el nombre: [R1,n]).
  * - Los comentarios empiezan con #.
  *
- * Funciona en el navegador (window.QPlanif.parse) y en Node (module.exports).
+ * Funciona en el navegador (window.RPlanif.parse) y en Node (module.exports).
  */
 (function (root) {
   'use strict';
@@ -110,5 +110,5 @@
 
   var api = { parse: parse, serialize: serialize, burstsToString: burstsToString };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  root.QPlanif = Object.assign(root.QPlanif || {}, api);
+  root.RPlanif = Object.assign(root.RPlanif || {}, api);
 })(typeof window !== 'undefined' ? window : globalThis);

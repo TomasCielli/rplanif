@@ -1,8 +1,8 @@
-/* qplanif+ — interfaz: modo manual (dibujás vos) y automático (resuelve el motor). */
+/* rplanif — interfaz: modo manual (dibujás vos) y automático (resuelve el motor). */
 (function () {
   'use strict';
 
-  var QP = window.QPlanif;
+  var QP = window.RPlanif;
   var $ = function (id) { return document.getElementById(id); };
 
   var PRESETS = [
@@ -90,8 +90,8 @@
     if (source !== 'table') { tableFromDef(def); renderTable(); }
 
     try {
-      localStorage.setItem('qplanif+.definition', $('definition').value);
-      localStorage.setItem('qplanif+.preemptedOrder', $('preempted-order').value);
+      localStorage.setItem('rplanif.definition', $('definition').value);
+      localStorage.setItem('rplanif.preemptedOrder', $('preempted-order').value);
     } catch (e) { /* sin storage */ }
 
     var names = function (d) { return JSON.stringify(d.tasks.map(function (t) { return t.name; })); };
@@ -569,8 +569,8 @@
   // arranque
   var saved = null;
   try {
-    saved = localStorage.getItem('qplanif+.definition');
-    var savedOrder = localStorage.getItem('qplanif+.preemptedOrder');
+    saved = localStorage.getItem('rplanif.definition');
+    var savedOrder = localStorage.getItem('rplanif.preemptedOrder');
     if (savedOrder && QP.PREEMPTED_ORDERS[savedOrder]) $('preempted-order').value = savedOrder;
   } catch (e) { /* sin storage */ }
   $('definition').value = saved || PRESETS[0].text;

@@ -31,7 +31,6 @@ button.wide { width: 100%; margin-top: 10px; }
 
 .topbar { background: linear-gradient(#7d7d7d, #5c5c5c); color: #fff; padding: 12px 24px; border-bottom: 4px solid var(--accent); display: flex; align-items: baseline; gap: 18px; }
 .topbar h1 { font-size: 26px; font-style: italic; }
-.topbar .plus { color: #ffd43b; font-style: normal; }
 .topbar p { margin: 0; opacity: .85; }
 
 .layout { display: grid; grid-template-columns: 400px 1fr; gap: 16px; padding: 16px; align-items: start; }

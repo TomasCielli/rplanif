@@ -1,5 +1,5 @@
 /*
- * qplanif+ — motor de planificación de CPU (sin DOM, testeable en Node).
+ * rplanif — motor de planificación de CPU (sin DOM, testeable en Node).
  *
  * Modelo (sigue la explicación de práctica de la cátedra):
  *  - Tiempo discreto. El instante t ocupa el intervalo [t, t+1).
@@ -259,5 +259,5 @@
 
   var api = { simulate: simulate, ALGORITHMS: ALGORITHMS, DEFAULT_QUEUES: DEFAULT_QUEUES, PREEMPTED_ORDERS: PREEMPTED_ORDERS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  root.QPlanif = Object.assign(root.QPlanif || {}, api);
+  root.RPlanif = Object.assign(root.RPlanif || {}, api);
 })(typeof window !== 'undefined' ? window : globalThis);
