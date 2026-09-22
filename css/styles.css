@@ -30,6 +30,7 @@
   --topbar-2: #5c5c5c;
   --cell: 30px;
   --row: 36px;
+  --label: 150px;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   color-scheme: light;
 }
@@ -79,6 +80,16 @@ button.primary { background: var(--accent); border-color: var(--accent-dark); co
 button.primary:hover { background: var(--accent-dark); }
 button.wide { width: 100%; margin-top: 10px; }
 .hidden { display: none !important; }
+button.mini { padding: 0 7px; line-height: 20px; font-size: 13px; border-color: transparent; background: transparent; color: var(--muted); }
+button.mini:hover { background: var(--panel-3); color: var(--text); }
+
+/* bloques plegables: el título (summary) se ve como un h2 y muestra un chevron */
+details.box > summary { list-style: none; cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; user-select: none; }
+details.box > summary::-webkit-details-marker { display: none; }
+details.box > summary::before { content: "▾"; font-size: 12px; transition: transform .15s; }
+details.box:not([open]) > summary::before { transform: rotate(-90deg); }
+details.box:not([open]) > summary { margin-bottom: 0; }
+details.box > summary:hover { color: var(--text); }
 code { background: var(--panel-3); padding: 1px 4px; border-radius: 3px; }
 
 .topbar { background: linear-gradient(var(--topbar-1), var(--topbar-2)); color: #fff; padding: 12px 24px; border-bottom: 4px solid var(--accent); display: flex; align-items: center; gap: 18px; }
@@ -87,8 +98,8 @@ code { background: var(--panel-3); padding: 1px 4px; border-radius: 3px; }
 .topbar .theme { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); color: #fff; padding: 5px 10px; }
 .topbar .theme:hover { background: rgba(255,255,255,.22); }
 
-.layout { display: grid; grid-template-columns: 400px 1fr; gap: 16px; padding: 16px; align-items: start; }
-@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+.layout { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 16px; padding: 16px; align-items: start; }
+.panel, .workspace { min-width: 0; }
 
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 16px; }
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
@@ -205,9 +216,17 @@ textarea { width: 100%; font-family: Consolas, "Courier New", monospace; font-si
 
 /* ---------- Minicalculadora ---------- */
 .metrics-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
-.metrics-row > div:first-child { flex: 0 1 auto; min-width: 0; }
+.metrics-row > :first-child { flex: 0 1 auto; min-width: 0; }
 .metrics-row .hint { max-width: 460px; margin-top: 6px; }
 .calc { width: 232px; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--panel-2); }
+.calc.floating { position: fixed; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,.25); background: var(--panel); }
+.calc.dragging { opacity: .92; }
+.calc.collapsed .calc-body { display: none; }
+.calc.collapsed { width: auto; min-width: 160px; }
+.calc-head { display: flex; align-items: center; justify-content: space-between; cursor: move; user-select: none; touch-action: none; margin-bottom: 6px; }
+.calc.collapsed .calc-head { margin-bottom: 0; }
+.calc-title { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.calc-actions { display: flex; gap: 2px; }
 .calc input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-family: Consolas, "Courier New", monospace; font-size: 14px; text-align: right; }
 .calc-result { font-size: 20px; font-weight: 600; text-align: right; min-height: 28px; margin: 4px 0 6px; font-variant-numeric: tabular-nums; }
 .calc-result.err { font-size: 12px; font-weight: 400; color: var(--muted); }
@@ -219,3 +238,36 @@ textarea { width: 100%; font-family: Consolas, "Courier New", monospace; font-si
 .calc-history li { cursor: pointer; display: flex; justify-content: space-between; gap: 8px; padding: 1px 2px; border-radius: 3px; }
 .calc-history li:hover { background: var(--panel-3); color: var(--text); }
 .calc-history li b { font-weight: 600; }
+
+/* ---------- Pantallas chicas ---------- */
+@media (max-width: 900px) {
+  :root { --cell: 26px; --row: 32px; --label: 104px; }
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 10px; }
+  #table-view, .metrics-box { overflow-x: auto; }
+  .calc-keys { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .field input, .field select, textarea { max-width: 100%; }
+  .panel { position: static; padding: 12px; gap: 14px; }
+  .workspace { padding: 12px; }
+  .topbar { padding: 8px 12px; gap: 10px; flex-wrap: wrap; }
+  .topbar h1 { font-size: 20px; }
+  .topbar p { font-size: 12px; flex-basis: 100%; order: 3; }
+  .toolbar { gap: 8px; }
+  .tools { gap: 4px; }
+  .brush { padding: 4px 7px; font-size: 12px; }
+  .gantt .rowlabel { padding: 0 6px; font-size: 12px; }
+  .gantt .rowlabel small { display: none; }
+  .metrics-row { gap: 12px; }
+  .metrics-row > :first-child { width: 100%; }
+  .metrics-box th, .metrics-box td { padding: 4px 6px; font-size: 12px; }
+  .metrics-box table input { width: 52px; }
+  .calc { width: 100%; }
+  .calc.collapsed { width: auto; }
+  .proc-table input.num { width: 40px; }
+  .proc-table input.bursts { min-width: 90px; }
+  .feedback ul { max-height: 160px; }
+}
+@media (max-width: 600px) {
+  /* iOS hace zoom si un campo tiene menos de 16px */
+  input, select, textarea, .proc-table input, .metrics-box input, .calc input { font-size: 16px; }
+  .proc-table input.num { width: 44px; }
+}

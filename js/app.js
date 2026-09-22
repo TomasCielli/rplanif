@@ -280,7 +280,7 @@
     var wrap = $('gantt');
     var grid = document.createElement('div');
     grid.className = 'gantt' + (editable ? ' editable' : '');
-    grid.style.gridTemplateColumns = '150px repeat(' + T + ', var(--cell))';
+    grid.style.gridTemplateColumns = 'var(--label) repeat(' + T + ', var(--cell))';
 
     var corner = document.createElement('div'); corner.className = 'head rowlabel'; corner.textContent = 't';
     grid.appendChild(corner);
@@ -364,19 +364,28 @@
     document.querySelectorAll('.metrics-box input').forEach(function (i) { i.classList.remove('wrong', 'right'); });
   }
 
-  $('gantt').addEventListener('mousedown', function (e) {
-    if (state.mode !== 'manual') return;
+  var lastPointerType = 'mouse';
+  $('gantt').addEventListener('pointerdown', function (e) {
+    lastPointerType = e.pointerType;
+    if (state.mode !== 'manual' || e.pointerType !== 'mouse' || e.button !== 0) return;
     var cell = e.target.closest('.cell');
     if (!cell) return;
     e.preventDefault();
     state.painting = true;
     paint(cell, false);
   });
-  $('gantt').addEventListener('mouseover', function (e) {
-    if (!state.painting) return;
+  $('gantt').addEventListener('pointerover', function (e) {
+    if (!state.painting || e.pointerType !== 'mouse') return;
     paint(e.target.closest('.cell'), true);
   });
-  window.addEventListener('mouseup', function () { state.painting = false; });
+  // Con el dedo o lápiz: "click" sólo llega si no hubo desplazamiento → tocar pinta, arrastrar hace scroll.
+  $('gantt').addEventListener('click', function (e) {
+    if (state.mode !== 'manual' || lastPointerType === 'mouse') return;
+    var cell = e.target.closest('.cell');
+    if (cell) paint(cell, false);
+  });
+  window.addEventListener('pointerup', function () { state.painting = false; });
+  window.addEventListener('pointercancel', function () { state.painting = false; });
   document.addEventListener('mouseleave', function () { state.painting = false; });
 
   /* ---------------- métricas ---------------- */
@@ -811,6 +820,7 @@
   $('btn-check').addEventListener('click', check);
   $('btn-clear').addEventListener('click', function () { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.diff = null; render(); });
   $('btn-more').addEventListener('click', function () { state.horizon += 5; render(); });
+  $('btn-less').addEventListener('click', function () { state.horizon = Math.max(5, state.horizon - 5); render(); });
 
   /* ---------------- minicalculadora ---------------- */
 
@@ -852,8 +862,8 @@
       if (e.key === 'Enter' || e.key === '=') { e.preventDefault(); compute(); }
       if (e.key === 'Escape') { expr.value = ''; preview(); }
     });
-    // mousedown + preventDefault: los botones no roban el foco del campo
-    $('calc-keys').addEventListener('mousedown', function (e) {
+    // pointerdown + preventDefault: los botones no roban el foco del campo
+    $('calc-keys').addEventListener('pointerdown', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
       e.preventDefault();
@@ -875,6 +885,73 @@
       expr.focus();
       insert(fmtNum(entries[+li.dataset.i].value));
     });
+  })();
+
+  /* ---------------- bloques plegables y calculadora movible ---------------- */
+
+  (function layoutUI() {
+    var ui = { sections: {}, calc: { floating: false, x: 0, y: 0, collapsed: false } };
+    try { ui = Object.assign(ui, JSON.parse(localStorage.getItem('rplanif.ui') || '{}')); } catch (e) { /* sin storage */ }
+    function saveUI() { try { localStorage.setItem('rplanif.ui', JSON.stringify(ui)); } catch (e) { /* sin storage */ } }
+
+    // secciones: recordar abierto/cerrado
+    document.querySelectorAll('details[id]').forEach(function (d) {
+      if (ui.sections[d.id] !== undefined) d.open = ui.sections[d.id];
+      d.addEventListener('toggle', function () { ui.sections[d.id] = d.open; saveUI(); });
+    });
+
+    var calc = $('calc'), head = $('calc-head');
+    var narrow = function () { return window.innerWidth < 900; };
+
+    function applyCalc() {
+      calc.classList.toggle('collapsed', !!ui.calc.collapsed);
+      $('calc-min').textContent = ui.calc.collapsed ? '+' : '–';
+      var floating = ui.calc.floating && !narrow();     // en celular siempre acoplada
+      calc.classList.toggle('floating', floating);
+      $('calc-dock').classList.toggle('hidden', !floating);
+      if (floating) place(ui.calc.x, ui.calc.y); else { calc.style.left = ''; calc.style.top = ''; }
+    }
+    function place(x, y) {
+      var r = calc.getBoundingClientRect();
+      x = Math.min(Math.max(0, x), Math.max(0, window.innerWidth - r.width));
+      y = Math.min(Math.max(0, y), Math.max(0, window.innerHeight - r.height));
+      calc.style.left = x + 'px'; calc.style.top = y + 'px';
+      ui.calc.x = x; ui.calc.y = y;
+    }
+
+    $('calc-min').addEventListener('click', function () { ui.calc.collapsed = !ui.calc.collapsed; applyCalc(); saveUI(); });
+    $('calc-dock').addEventListener('click', function () { ui.calc.floating = false; applyCalc(); saveUI(); });
+
+    // arrastre desde el título (mouse o dedo); al soltar queda flotando en esa posición
+    var drag = null;
+    head.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('button') || narrow()) return;
+      var r = calc.getBoundingClientRect();
+      drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false, x0: e.clientX, y0: e.clientY };
+      head.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    head.addEventListener('pointermove', function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      if (!drag.moved) {
+        if (Math.abs(e.clientX - drag.x0) + Math.abs(e.clientY - drag.y0) < 4) return;
+        drag.moved = true;
+        ui.calc.floating = true;
+        calc.classList.add('floating', 'dragging');
+        $('calc-dock').classList.remove('hidden');
+      }
+      place(e.clientX - drag.dx, e.clientY - drag.dy);
+    });
+    function endDrag(e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      calc.classList.remove('dragging');
+      drag = null;
+      saveUI();
+    }
+    head.addEventListener('pointerup', endDrag);
+    head.addEventListener('pointercancel', endDrag);
+    window.addEventListener('resize', applyCalc);
+    applyCalc();
   })();
 
   // arranque

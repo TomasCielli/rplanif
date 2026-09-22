@@ -15,8 +15,8 @@
 
   <main class="layout">
     <aside class="panel">
-      <section>
-        <h2>1. Procesos</h2>
+      <details class="box" id="sec-procesos" open>
+        <summary>1. Procesos</summary>
         <div class="file-row">
           <button id="btn-import" title="Abrir un archivo .json exportado por rplanif, o un .txt con código qplanif">📂 Importar</button>
           <button id="btn-export" title="Guardar procesos, algoritmo y diagrama manual en un .json">💾 Exportar</button>
@@ -49,10 +49,10 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
           </details>
         </div>
         <ul id="parse-errors" class="errors"></ul>
-      </section>
+      </details>
 
-      <section>
-        <h2>2. Algoritmo</h2>
+      <details class="box" id="sec-algoritmo" open>
+        <summary>2. Algoritmo</summary>
         <label class="field">
           <span>Política</span>
           <select id="algorithm"></select>
@@ -74,10 +74,10 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
           <select id="preempted-order"></select>
         </label>
         <p id="algorithm-hint" class="hint"></p>
-      </section>
+      </details>
 
       <section>
-        <details class="help">
+        <details class="help" id="sec-reglas">
           <summary>Reglas que aplica el simulador</summary>
           <ul>
             <li>▲ marca la llegada del proceso al sistema (INICIO); ▼ marca el instante en que termina por completo. Ambos van sobre la línea de tiempo, no dentro de una celda.</li>
@@ -107,24 +107,35 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
           <span class="spacer"></span>
           <button id="btn-check" class="primary">Corregir</button>
           <button id="btn-clear">Limpiar</button>
+          <button id="btn-less" title="Quitar 5 columnas de tiempo">−5</button>
           <button id="btn-more" title="Agregar 5 columnas de tiempo">+5 instantes</button>
         </div>
         <button id="btn-image" title="Descargar el diagrama que se ve como imagen PNG">🖼️ Imagen</button>
       </div>
 
-      <p id="status" class="status"></p>
-      <div id="gantt" class="gantt-wrap"><div class="empty">Cargá los procesos desde el panel de la izquierda.</div></div>
-      <div id="legend" class="legend"></div>
-      <div id="feedback" class="feedback hidden"></div>
+      <details class="box" id="sec-diagrama" open>
+        <summary>Diagrama</summary>
+        <p id="status" class="status"></p>
+        <div id="gantt" class="gantt-wrap"><div class="empty">Cargá los procesos desde el panel de la izquierda.</div></div>
+        <div id="legend" class="legend"></div>
+        <div id="feedback" class="feedback hidden"></div>
+      </details>
 
       <section class="metrics-box">
         <div class="metrics-row">
-          <div>
-            <h2>Tiempos</h2>
+          <details class="box" id="sec-tiempos" open>
+            <summary>Tiempos</summary>
             <div id="metrics"></div>
-          </div>
+          </details>
           <div class="calc" id="calc">
-            <h2>Calculadora</h2>
+            <div class="calc-head" id="calc-head" title="Arrastrá para mover la calculadora">
+              <span class="calc-title">Calculadora</span>
+              <span class="calc-actions">
+                <button id="calc-dock" class="mini hidden" title="Volver a acoplar junto a la tabla">⤓</button>
+                <button id="calc-min" class="mini" title="Minimizar / restaurar">–</button>
+              </span>
+            </div>
+            <div class="calc-body">
             <input type="text" id="calc-expr" placeholder="(9+13+15+21)/4" autocomplete="off" spellcheck="false">
             <div id="calc-result" class="calc-result">&nbsp;</div>
             <div class="calc-keys" id="calc-keys">
@@ -135,6 +146,7 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
               <button data-k=")" class="op">)</button><button data-a="clear" class="op" title="Borrar todo">C</button><button data-a="back" class="op" title="Borrar el último carácter">⌫</button><button data-a="eq" class="eq" title="Calcular (Enter)">=</button>
             </div>
             <ul id="calc-history" class="calc-history" title="Clic en un resultado para reutilizarlo"></ul>
+            </div>
           </div>
         </div>
       </section>

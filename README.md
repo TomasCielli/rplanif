@@ -42,6 +42,17 @@ Abrí `index.html` en cualquier navegador. No hay que instalar nada.
 5. **Tema**: el botón de la barra superior alterna claro / oscuro. Por defecto sigue la
    preferencia del sistema y recuerda tu elección.
 
+6. **Calculadora**: al lado de la tabla de tiempos, para las sumas y divisiones de
+   T<sub>R</sub>, T<sub>E</sub> y promedios. Se puede arrastrar desde su título y dejar
+   flotando en cualquier lado (⤓ la vuelve a acoplar) y minimizar con –.
+
+7. **Bloques plegables**: Procesos, Algoritmo, Diagrama, Tiempos y el log se pliegan desde
+   su título; el estado se recuerda. Con **−5 / +5 instantes** ajustás el ancho del
+   diagrama manual.
+
+8. **Celular**: la interfaz pasa a una columna; el diagrama se desplaza horizontalmente y
+   se pinta tocando una celda (arrastrar con el dedo desplaza, no pinta).
+
 ## Importar y exportar
 
 - **Exportar** guarda un `.json` con todo: procesos, algoritmo y sus parámetros, y el
