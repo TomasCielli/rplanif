@@ -777,10 +777,17 @@
 
   /* ---------------- tema ---------------- */
 
+  function themeIcon() {
+    var icon = $('theme-toggle').querySelector('.disco');
+    if (icon.classList.contains('party')) return;
+    icon.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '🌙' : '☀️';
+  }
+
   function applyTheme(theme) {
     if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     else document.documentElement.removeAttribute('data-theme');
     $('theme-toggle').title = theme === 'dark' ? 'Tema oscuro (clic para claro)' : 'Tema claro (clic para oscuro)';
+    themeIcon();
     try { localStorage.setItem('rplanif.theme', theme); } catch (e) { /* sin storage */ }
   }
 
@@ -812,7 +819,7 @@
       themeClicks = [];
       var disco = $('theme-toggle').querySelector('.disco');
       disco.textContent = '🪩'; disco.classList.add('party');
-      setTimeout(function () { disco.classList.remove('party'); disco.textContent = '💿'; }, 4000);
+      setTimeout(function () { disco.classList.remove('party'); themeIcon(); }, 4000);
       window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1', '_blank', 'noopener');
     }
   });
@@ -984,6 +991,7 @@
 
   // arranque
   $('theme-toggle').title = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Tema oscuro (clic para claro)' : 'Tema claro (clic para oscuro)';
+  themeIcon();
   var restored = false;
   try {
     var raw = localStorage.getItem('rplanif.snapshot');
