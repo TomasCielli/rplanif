@@ -97,20 +97,39 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
 
     <section class="workspace">
       <div class="toolbar">
-        <div class="segmented" role="tablist">
-          <button id="mode-manual" class="active" role="tab">✏️ Manual</button>
-          <button id="mode-auto" role="tab">⚙️ Automático</button>
+        <!-- fila 1: modo + exportar imagen -->
+        <div class="toolbar-row">
+          <div class="segmented" role="tablist">
+            <button id="mode-manual" class="active" role="tab">✏️ Manual</button>
+            <button id="mode-auto" role="tab">⚙️ Automático</button>
+          </div>
+          <span class="spacer"></span>
+          <button id="btn-image" title="Descargar el diagrama que se ve como imagen PNG">🖼️ Imagen</button>
         </div>
-        <div id="manual-tools" class="tools">
+        <!-- fila 2: pinceles (sólo manual) -->
+        <div id="manual-tools" class="toolbar-row">
           <span class="tools-label">Pincel:</span>
           <div id="brushes" class="brushes"></div>
-          <span class="spacer"></span>
-          <button id="btn-check" class="primary">Corregir</button>
-          <button id="btn-clear">Limpiar</button>
-          <button id="btn-less" title="Quitar 5 columnas de tiempo">−5</button>
-          <button id="btn-more" title="Agregar 5 columnas de tiempo">+5 instantes</button>
         </div>
-        <button id="btn-image" title="Descargar el diagrama que se ve como imagen PNG">🖼️ Imagen</button>
+        <!-- fila 3: acciones y ajuste de instantes (sólo manual) -->
+        <div id="manual-actions" class="toolbar-row">
+          <div class="group">
+            <button id="btn-check" class="primary">Corregir</button>
+            <button id="btn-clear">Limpiar</button>
+          </div>
+          <span class="spacer"></span>
+          <details class="popover" id="horizon-box">
+            <summary title="Cantidad de instantes del diagrama manual">⏱ Instantes: <b id="horizon-count">20</b></summary>
+            <div class="popover-body">
+              <span class="tools-label">Ancho del diagrama manual</span>
+              <div class="stepper" id="horizon-stepper">
+                <button data-d="-10">−10</button><button data-d="-5">−5</button><button data-d="-1">−1</button>
+                <b id="horizon-value">20</b>
+                <button data-d="1">+1</button><button data-d="5">+5</button><button data-d="10">+10</button>
+              </div>
+            </div>
+          </details>
+        </div>
       </div>
 
       <details class="box" id="sec-diagrama" open>

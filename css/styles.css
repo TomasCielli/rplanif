@@ -119,7 +119,20 @@ textarea { width: 100%; font-family: Consolas, "Courier New", monospace; font-si
 .file-row button { flex: 1; }
 
 .workspace { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.toolbar { display: flex; flex-direction: column; gap: 8px; }
+.toolbar-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.group { display: inline-flex; gap: 6px; }
+/* desplegable anclado a su botón */
+details.popover { position: relative; }
+details.popover > summary { list-style: none; cursor: pointer; border: 1px solid var(--border); background: var(--panel); border-radius: 6px; padding: 6px 12px; user-select: none; }
+details.popover > summary::-webkit-details-marker { display: none; }
+details.popover > summary::after { content: " ▾"; color: var(--muted); }
+details.popover[open] > summary { border-color: var(--muted); }
+details.popover > summary:hover { border-color: var(--muted); background: var(--panel-2); }
+.popover-body { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.2); display: flex; flex-direction: column; gap: 8px; white-space: nowrap; }
+.stepper { display: inline-flex; align-items: center; gap: 4px; }
+.stepper button { padding: 4px 8px; min-width: 40px; font-variant-numeric: tabular-nums; }
+.stepper b { min-width: 44px; text-align: center; font-size: 16px; font-variant-numeric: tabular-nums; }
 .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .segmented button { border: 0; border-radius: 0; padding: 6px 14px; }
 .segmented button.active { background: var(--accent); color: var(--accent-text); }
@@ -251,8 +264,8 @@ textarea { width: 100%; font-family: Consolas, "Courier New", monospace; font-si
   .topbar { padding: 8px 12px; gap: 10px; flex-wrap: wrap; }
   .topbar h1 { font-size: 20px; }
   .topbar p { font-size: 12px; flex-basis: 100%; order: 3; }
-  .toolbar { gap: 8px; }
-  .tools { gap: 4px; }
+  .toolbar-row { gap: 6px; }
+  .popover-body { right: auto; left: 0; }
   .brush { padding: 4px 7px; font-size: 12px; }
   .gantt .rowlabel { padding: 0 6px; font-size: 12px; }
   .gantt .rowlabel small { display: none; }

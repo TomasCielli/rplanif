@@ -191,6 +191,7 @@
     $('mode-manual').classList.toggle('active', mode === 'manual');
     $('mode-auto').classList.toggle('active', mode === 'auto');
     $('manual-tools').classList.toggle('hidden', mode !== 'manual');
+    $('manual-actions').classList.toggle('hidden', mode !== 'manual');
     $('log-box').classList.toggle('hidden', mode !== 'auto');
     render();
   }
@@ -207,6 +208,7 @@
       ? ' — dibujá el diagrama y apretá "Corregir".'
       : ' — solución calculada por el simulador (' + state.auto.totalTime + ' instantes).');
     renderBrushes();
+    renderHorizon();
     renderLegend();
     // en automático se agrega una columna extra para que entre el ▼ del último proceso
     if (state.mode === 'manual') renderGantt(manualCell, manualMarkers, true, state.horizon);
@@ -225,6 +227,12 @@
     $('metrics').innerHTML = '<p class="hint">Sin procesos.</p>';
     $('log').textContent = '';
     renderBrushes();
+    renderHorizon();
+  }
+
+  function renderHorizon() {
+    $('horizon-count').textContent = state.horizon;
+    $('horizon-value').textContent = state.horizon;
   }
 
   function manualCell(pid, t) { return state.manual[pid + ':' + t] || { s: 'none' }; }
@@ -819,8 +827,17 @@
   $('mode-auto').addEventListener('click', function () { setMode('auto'); });
   $('btn-check').addEventListener('click', check);
   $('btn-clear').addEventListener('click', function () { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.diff = null; render(); });
-  $('btn-more').addEventListener('click', function () { state.horizon += 5; render(); });
-  $('btn-less').addEventListener('click', function () { state.horizon = Math.max(5, state.horizon - 5); render(); });
+  $('horizon-stepper').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-d]');
+    if (!b) return;
+    state.horizon = Math.max(5, state.horizon + parseInt(b.dataset.d, 10));
+    render();
+  });
+  // el desplegable se cierra al hacer clic afuera
+  document.addEventListener('pointerdown', function (e) {
+    var box = $('horizon-box');
+    if (box.open && !box.contains(e.target)) box.open = false;
+  });
 
   /* ---------------- minicalculadora ---------------- */
 
