@@ -410,9 +410,10 @@
 
   function fillCell(el, c, mk) {
     var style = c.s === 'io' ? ' style="background:' + resourceColor(c.r) + '"' : '';
+    var first = el.dataset.t === '0' ? ' first' : '';
     el.innerHTML = '<span class="bar ' + c.s + '"' + style + '>' + escapeHtml(cellLabel(c)) + '</span>'
-      + (mk.up ? '<i class="mk up"></i>' : '')
-      + (mk.down ? '<i class="mk down"></i>' : '');
+      + (mk.up ? '<i class="mk up' + first + '"></i>' : '')
+      + (mk.down ? '<i class="mk down' + first + '"></i>' : '');
   }
 
   function renderGantt(getCell, getMarkers, editable, T) {
@@ -900,7 +901,7 @@
       // marcadores (encima de las barras y separadores)
       if (!row.summary) {
         for (var t2 = 0; t2 < m.T; t2++) {
-          var mk = row.marks[t2], mx = x0 + t2 * cellW;
+          var mk = row.marks[t2], mx = x0 + t2 * cellW + (t2 === 0 ? 6 : 0);   // en t=0, entero dentro de la celda
           ctx.fillStyle = C.io;
           if (mk.up) { ctx.beginPath(); ctx.moveTo(mx - 6, y + rowH); ctx.lineTo(mx + 6, y + rowH); ctx.lineTo(mx, y + rowH - 8); ctx.closePath(); ctx.fill(); }
           if (mk.down) { ctx.beginPath(); ctx.moveTo(mx - 6, y); ctx.lineTo(mx + 6, y); ctx.lineTo(mx, y + 8); ctx.closePath(); ctx.fill(); }
