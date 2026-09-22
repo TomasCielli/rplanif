@@ -18,6 +18,9 @@
  *
  * Estados de la línea de tiempo por proceso e instante:
  *   {s:'cpu'} | {s:'io', r} | {s:'wait', r} (bloqueado esperando el recurso)
+ *
+ * readyTimeline[t] lista los PID que esperan la CPU en el instante t (sin el que la
+ * está usando), en el orden en que los tomaría el planificador.
  *   | {s:'ready'} | {s:'none'} (todavía no llegó o ya terminó)
  */
 (function (root) {
@@ -94,6 +97,7 @@
     var pendingReady = [];     // terminaron E/S al final del instante anterior
     var pendingIO = [];        // terminaron CPU y piden E/S
     var cpuTimeline = [];
+    var readyTimeline = [];      // quiénes esperan la CPU en cada instante, en orden de cola
     var events = [];
     function log(t, msg) { events.push({ t: t, msg: msg }); }
 
@@ -206,6 +210,7 @@
       // 5) Registro del instante t.
       procs.forEach(function (p) { p.timeline[t] = snapshot(p); });
       cpuTimeline[t] = running ? running.pid : null;
+      readyTimeline[t] = ready.map(function (p) { return p.pid; });
       resourceList.forEach(function (r) { r.timeline[t] = r.busy ? r.busy.pid : null; });
 
       // 6) Ejecución del instante t y transiciones al final del mismo.
@@ -250,6 +255,7 @@
       procs: out,
       resources: resourceList.map(function (r) { return { name: r.name, timeline: r.timeline }; }),
       cpuTimeline: cpuTimeline,
+      readyTimeline: readyTimeline,
       totalTime: t,
       events: events,
       metrics: {

@@ -163,7 +163,7 @@ details.popover > summary:hover { border-color: var(--muted); background: var(--
 .gantt .head { font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); position: relative; }
 .gantt .head.major { color: var(--text); font-weight: 600; }
 .gantt .head::before { content: ""; position: absolute; left: 0; bottom: 0; height: 4px; border-left: 1px solid var(--border); }
-.gantt .rowlabel { justify-content: flex-start; padding: 0 10px; font-weight: 600; white-space: nowrap; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--panel-2); position: sticky; left: 0; z-index: 1; }
+.gantt .rowlabel { justify-content: flex-start; padding: 0 10px; font-weight: 600; white-space: nowrap; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--panel-2); position: sticky; left: 0; z-index: 5; }
 .gantt .rowlabel small { font-weight: 400; color: var(--muted); margin-left: 6px; }
 .gantt .cell { border-right: 1px dotted var(--border-soft); border-bottom: 1px solid var(--border); position: relative; }
 .gantt .cell.tick { border-right: 1px solid var(--border-tick); }
@@ -221,8 +221,8 @@ details.popover > summary:hover { border-color: var(--muted); background: var(--
 
 /* ---------- Tabla de procesos (panel) ---------- */
 .proc-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
-.proc-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 2px 4px; font-size: 11px; }
-.proc-table td { padding: 2px 2px; vertical-align: middle; }
+.proc-table th { text-align: center; color: var(--muted); font-weight: 600; padding: 2px 4px; font-size: 11px; }
+.proc-table td { padding: 2px 2px; vertical-align: middle; text-align: center; }
 .proc-table input { width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; }
 .proc-table input.num { width: 46px; text-align: center; }
 .proc-table input.invalid, #resources-input.invalid { border-color: var(--bad); background: var(--bad-bg); }
@@ -234,16 +234,22 @@ details.popover > summary:hover { border-color: var(--muted); background: var(--
 /* ---------- Minicalculadora ---------- */
 .metrics-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
 .metrics-row > :first-child { flex: 0 1 auto; min-width: 0; }
-.metrics-row .hint { max-width: 460px; margin-top: 6px; }
-.calc { width: 232px; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--panel-2); }
-.calc.floating { position: fixed; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,.25); background: var(--panel); }
-.calc.dragging { opacity: .92; }
-.calc.collapsed .calc-body { display: none; }
-.calc.collapsed { width: auto; min-width: 160px; }
-.calc-head { display: flex; align-items: center; justify-content: space-between; cursor: move; user-select: none; touch-action: none; margin-bottom: 6px; }
-.calc.collapsed .calc-head { margin-bottom: 0; }
-.calc-title { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.metrics-row .hint { max-width: 380px; margin-top: 6px; }
+.calc { position: relative; }
+.calc-head { display: flex; align-items: center; gap: 8px; cursor: move; user-select: none; touch-action: none;
+  border: 1px solid var(--border); background: var(--panel); border-radius: 6px; padding: 5px 10px; }
+.calc-head:hover { border-color: var(--muted); background: var(--panel-2); }
+.calc-title { font-size: 13px; color: var(--muted); }
 .calc-actions { display: flex; gap: 2px; }
+.calc-body { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; width: 232px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.calc.collapsed .calc-body { display: none; }
+/* flotante: se despega de la barra y arrastra el panel entero */
+.calc.floating { position: fixed; z-index: 50; width: 232px; border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px; background: var(--panel); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.calc.floating .calc-head { border: 0; background: transparent; padding: 0; margin-bottom: 6px; }
+.calc.floating .calc-body { position: static; width: auto; border: 0; padding: 0; box-shadow: none; }
+.calc.dragging { opacity: .92; }
 .calc input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-family: Consolas, "Courier New", monospace; font-size: 14px; text-align: right; }
 .calc-result { font-size: 20px; font-weight: 600; text-align: right; min-height: 28px; margin: 4px 0 6px; font-variant-numeric: tabular-nums; }
 .calc-result.err { font-size: 12px; font-weight: 400; color: var(--muted); }
@@ -277,8 +283,7 @@ details.popover > summary:hover { border-color: var(--muted); background: var(--
   .metrics-row > :first-child { width: 100%; }
   .metrics-box th, .metrics-box td { padding: 4px 6px; font-size: 12px; }
   .metrics-box table input { width: 52px; }
-  .calc { width: 100%; }
-  .calc.collapsed { width: auto; }
+  .calc-body { right: auto; left: 0; }
   .proc-table input.num { width: 40px; }
   .proc-table input.bursts { min-width: 90px; }
   .feedback ul { max-height: 160px; }
@@ -296,3 +301,16 @@ table:hover .colhead .mv, .colhead .mv:focus-visible { opacity: 1; }
 .colhead .mv:hover { color: var(--text); background: var(--panel-3); border-radius: 3px; }
 .colhead .mv[disabled] { visibility: hidden; }
 @media (max-width: 900px) { .colhead .mv { opacity: 1; } }
+
+/* ---------- Cola de listos ---------- */
+.readyq { max-height: 280px; overflow: auto; width: 250px; }
+.metrics-row > #sec-ready { flex: 0 0 auto; }
+.readyq-table { border-collapse: collapse; font-size: 13px; width: 100%; }
+.readyq-table th, .readyq-table td { border: 1px solid var(--border); padding: 3px 8px; }
+.readyq-table th { background: var(--panel-3); font-weight: 600; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; position: sticky; top: 0; }
+.readyq-table td.t { text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; width: 34px; }
+.readyq-table td:last-child { font-variant-numeric: tabular-nums; }
+.readyq-table input { width: 100%; min-width: 88px; padding: 2px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; }
+.readyq-table input:focus { border-color: var(--border); background: var(--panel); }
+.metrics-box .readyq-table input.wrong { border-color: var(--bad); background: var(--bad-bg); }
+.metrics-box .readyq-table input.right { border-color: var(--ok); background: var(--ok-bg); }

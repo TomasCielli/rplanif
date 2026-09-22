@@ -75,14 +75,16 @@
     }).join('');
   }
 
-  // ↑ ↓ (y Enter) recorren la columna en vez de cambiar el número del campo.
+  // ↑ ↓ (y Enter) recorren la tabla en vez de cambiar el número del campo. Con 'attr' se
+  // recorre la columna (los campos con el mismo valor de ese atributo); sin él, la lista.
   function arrowNav(container, e, attr) {
     var inp = e.target.closest('input');
     if (!inp) return;
     var d = (e.key === 'ArrowDown' || e.key === 'Enter') ? 1 : e.key === 'ArrowUp' ? -1 : 0;
     if (!d) return;
     e.preventDefault();
-    var same = [].slice.call(container.querySelectorAll('input[' + attr + '="' + inp.getAttribute(attr) + '"]'));
+    var sel = attr ? 'input[' + attr + '="' + inp.getAttribute(attr) + '"]' : 'input';
+    var same = [].slice.call(container.querySelectorAll(sel));
     var next = same[same.indexOf(inp) + d];
     if (next) { next.focus(); next.select(); }
   }
@@ -92,7 +94,7 @@
     // modelo editable de la tabla: bursts como string con el formato de entrada
     table: { resources: [], tasks: [] },
     // manual: celdas pintadas y marcadores (▲ llegada, ▼ fin) por "pid:t"
-    manual: {}, markers: {}, manualMetrics: {},
+    manual: {}, markers: {}, manualMetrics: {}, ready: {},
     mode: 'manual', brush: 'cpu', horizon: 20,
     diff: null, painting: false,
   };
@@ -155,7 +157,7 @@
     // El diagrama manual está indexado por posición (pid), así que sobrevive a renombrar o
     // editar atributos; sólo se descarta si cambia la cantidad de procesos.
     var sameTasks = !!state.def && state.def.tasks.length === def.tasks.length;
-    if (!sameTasks) { state.manual = {}; state.markers = {}; state.manualMetrics = {}; }
+    if (!sameTasks) { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.ready = {}; }
 
     state.def = def;
     state.cfg = readConfig();
@@ -303,6 +305,7 @@
     if (state.mode === 'manual') renderGantt(manualCell, manualMarkers, true, state.horizon);
     else renderGantt(autoCell, autoMarkers, false, state.auto.totalTime + 1);
     renderMetrics();
+    renderReady();
     renderFeedback();
     renderLog();
     syncFinishInputs();
@@ -315,6 +318,7 @@
     $('legend').innerHTML = '';
     $('feedback').classList.add('hidden');
     $('metrics').innerHTML = '<p class="hint">Sin procesos.</p>';
+    $('ready').innerHTML = '<p class="hint">Sin procesos.</p>';
     $('log').textContent = '';
     renderBrushes();
     renderHorizon();
@@ -528,6 +532,50 @@
 
   /* ---------------- métricas ---------------- */
 
+  /* ---------------- cola de listos ---------------- */
+
+  function queueNames(t) {
+    return (state.auto.readyTimeline[t] || []).map(function (pid) { return state.auto.procs[pid - 1].name; }).join(', ');
+  }
+
+  function normQueue(text) {
+    return String(text == null ? '' : text).split(/[\s,;]+/).filter(Boolean);
+  }
+
+  function renderReady() {
+    var box = $('ready');
+    var manual = state.mode === 'manual';
+    var T = manual ? state.horizon : state.auto.totalTime;
+    var rows = '';
+    for (var t = 0; t < T; t++) {
+      rows += '<tr><td class="t">' + t + '</td><td>' + (manual
+        ? '<input data-t="' + t + '" value="' + escapeAttr(state.ready[t] || '') + '" placeholder="—" autocomplete="off" spellcheck="false">'
+        : (queueNames(t) || '·')) + '</td></tr>';
+    }
+    box.innerHTML = '<table class="readyq-table"><thead><tr><th>t</th><th>Esperan la CPU</th></tr></thead><tbody>'
+      + rows + '</tbody></table>'
+      + (manual ? '<p class="hint">Escribí los procesos en el orden en que los tomaría el planificador, separados por coma. "Corregir" también la revisa.</p>'
+                : '<p class="hint">Quiénes esperan la CPU en cada instante (sin el que la está usando ni los que están en E/S).</p>');
+
+    box.querySelectorAll('input').forEach(function (inp) {
+      inp.addEventListener('input', function () {
+        if (inp.value.trim() === '') delete state.ready[inp.dataset.t];
+        else state.ready[inp.dataset.t] = inp.value;
+        inp.classList.remove('wrong', 'right');
+        persist();
+      });
+    });
+    if (state.diff) markReadyInputs();
+  }
+
+  function markReadyInputs() {
+    document.querySelectorAll('#ready input').forEach(function (inp) {
+      var r = state.diff.queue[inp.dataset.t];
+      if (r === undefined) return;
+      inp.classList.add(r ? 'right' : 'wrong');
+    });
+  }
+
   function renderMetrics() {
     var box = $('metrics');
     var manual = state.mode === 'manual';
@@ -663,7 +711,19 @@
       if (!right) metricMsgs.push(m[2] + ' correcto = ' + fmt(m[1]) + ' (pusiste ' + avg[m[0]] + ').');
     });
 
-    state.diff = { wrong: wrong, messages: messages, metricMsgs: metricMsgs, metrics: metrics, total: total, ok: ok };
+    var queue = {};
+    var queueMsgs = [];
+    Object.keys(state.ready).forEach(function (t) {
+      var got = normQueue(state.ready[t]);
+      if (!got.length) return;
+      var exp = normQueue(queueNames(+t));
+      var right = got.length === exp.length && got.every(function (n, i) { return n === exp[i]; });
+      queue[t] = right;
+      if (!right) queueMsgs.push('t=' + t + ': la cola de listos es ' + (exp.join(', ') || '(vacía)') + ' y pusiste ' + got.join(', ') + '.');
+    });
+
+    state.diff = { wrong: wrong, messages: messages, metricMsgs: metricMsgs, metrics: metrics,
+                   queue: queue, queueMsgs: queueMsgs, total: total, ok: ok };
     state.horizon = Math.max(state.horizon, auto.totalTime + 1);
     render();
   }
@@ -673,17 +733,18 @@
     var d = state.diff;
     if (!d || state.mode !== 'manual') { fb.classList.add('hidden'); return; }
     fb.classList.remove('hidden');
-    var allOk = !d.messages.length && !d.metricMsgs.length;
+    var allOk = !d.messages.length && !d.metricMsgs.length && !d.queueMsgs.length;
     fb.className = 'feedback ' + (allOk ? 'ok' : 'bad');
     var html;
     if (allOk) {
       html = '<h3>✔ ¡Diagrama correcto!</h3><p>Coincide con la solución del simulador para ' + describeConfig(state.cfg) + '.'
-        + (Object.keys(d.metrics).length ? ' Los tiempos que cargaste también están bien.' : '') + '</p>';
+        + (Object.keys(d.metrics).length || Object.keys(d.queue).length ? ' Los tiempos y la cola que cargaste también están bien.' : '') + '</p>';
     } else {
       var n = d.messages.length;
       html = '<h3>✘ ' + n + ' error' + (n === 1 ? '' : 'es') + ' en el diagrama (' + d.ok + ' de ' + d.total + ' bien)'
-        + (d.metricMsgs.length ? ' · ' + d.metricMsgs.length + ' tiempo' + (d.metricMsgs.length === 1 ? '' : 's') + ' mal' : '') + '</h3>';
-      var list = d.messages.slice(0, 25).concat(d.metricMsgs);
+        + (d.metricMsgs.length ? ' · ' + d.metricMsgs.length + ' tiempo' + (d.metricMsgs.length === 1 ? '' : 's') + ' mal' : '')
+        + (d.queueMsgs.length ? ' · ' + d.queueMsgs.length + ' en la cola de listos' : '') + '</h3>';
+      var list = d.messages.slice(0, 25).concat(d.metricMsgs, d.queueMsgs);
       html += '<ul>' + list.map(function (m) { return '<li>' + escapeHtml(m) + '</li>'; }).join('') + '</ul>';
       if (n > 25) html += '<p class="more">… y ' + (n - 25) + ' más. Las celdas marcadas en rojo muestran el detalle al pasar el mouse.</p>';
       html += '<p class="hint">Tip: pasá a "Automático" para ver la solución completa con el log de eventos.</p>';
@@ -707,7 +768,7 @@
         algorithm: $('algorithm').value, quantum: $('quantum').value, preemptive: $('preemptive').checked,
         queues: $('queues').value, preemptedOrder: $('preempted-order').value,
       },
-      manual: { cells: state.manual, markers: state.markers, metrics: state.manualMetrics, horizon: state.horizon },
+      manual: { cells: state.manual, markers: state.markers, metrics: state.manualMetrics, ready: state.ready, horizon: state.horizon },
     };
   }
 
@@ -894,6 +955,7 @@
     state.manual = m.cells || {};
     state.markers = m.markers || {};
     state.manualMetrics = m.metrics || {};
+    state.ready = m.ready || {};
     state.horizon = Math.max(m.horizon || 0, state.auto.totalTime + 4, 16);
     state.diff = null;
     render();
@@ -911,7 +973,7 @@
       return;
     } else {
       $('definition').value = text;
-      if (load('code')) { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.diff = null; render(); }
+      if (load('code')) { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.ready = {}; state.diff = null; render(); }
     }
     setSource('table');
   }
@@ -984,10 +1046,11 @@
   $('btn-add-task').addEventListener('click', addTask);
   $('proc-table').addEventListener('keydown', function (e) { arrowNav($('proc-table'), e, 'data-f'); });
   $('metrics').addEventListener('keydown', function (e) { arrowNav($('metrics'), e, 'data-m'); });
+  $('ready').addEventListener('keydown', function (e) { arrowNav($('ready'), e); });
   $('mode-manual').addEventListener('click', function () { setMode('manual'); });
   $('mode-auto').addEventListener('click', function () { setMode('auto'); });
   $('btn-check').addEventListener('click', check);
-  $('btn-clear').addEventListener('click', function () { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.diff = null; render(); });
+  $('btn-clear').addEventListener('click', function () { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.ready = {}; state.diff = null; render(); });
   $('horizon-stepper').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-d]');
     if (!b) return;
@@ -1068,7 +1131,7 @@
   /* ---------------- bloques plegables y calculadora movible ---------------- */
 
   (function layoutUI() {
-    var ui = { sections: {}, calc: { floating: false, x: 0, y: 0, collapsed: false } };
+    var ui = { sections: {}, calc: { floating: false, x: 0, y: 0, collapsed: true } };
     try { ui = Object.assign(ui, JSON.parse(localStorage.getItem('rplanif.ui') || '{}')); } catch (e) { /* sin storage */ }
     function saveUI() { try { localStorage.setItem('rplanif.ui', JSON.stringify(ui)); } catch (e) { /* sin storage */ } }
 

@@ -129,6 +129,27 @@ test('FIFO ejemplo 1', () => {
   assert.equal(res.metrics.tpe, (0 + 8 + 12 + 14) / 4);
 });
 
+test('la cola de listos queda registrada instante por instante', () => {
+  const res = run(EJEMPLO_1, { algorithm: 'FIFO' });
+  const q = (t) => res.readyTimeline[t].map((pid) => res.procs[pid - 1].name).join(',');
+  assert.equal(q(0), '');          // P1 toma la CPU apenas llega
+  assert.equal(q(1), '2');
+  assert.equal(q(2), '2,3');
+  assert.equal(q(3), '2,3,4');
+  assert.equal(q(8), '2,3,4');
+  assert.equal(q(9), '3,4');       // P2 pasa a la CPU
+  assert.equal(q(14), '4');
+  assert.equal(q(17), '');
+  assert.equal(res.readyTimeline.length, res.totalTime);
+});
+
+test('la cola de listos no incluye ni al que usa la CPU ni a los que están en E/S', () => {
+  const res = run(EJEMPLO_2, { algorithm: 'FIFO' });
+  assert.deepEqual(res.readyTimeline[3], [3]);   // P1 en E/S, P2 en CPU → sólo espera P3
+  assert.deepEqual(res.readyTimeline[5], [1]);   // P2 en E/S, P3 en CPU → sólo espera P1
+  assert.deepEqual(res.readyTimeline[9], []);    // P3 en E/S, P2 en CPU, P1 terminó
+});
+
 test('SJF ejemplo 1 (no apropiativo)', () => {
   const res = run(EJEMPLO_1, { algorithm: 'SJF' });
   assert.equal(cpuString(res), '111111111333222224444444');

@@ -48,15 +48,21 @@ Abrí `index.html` en cualquier navegador. No hay que instalar nada.
 5. **Tema**: el botón de la barra superior alterna claro / oscuro. Por defecto sigue la
    preferencia del sistema y recuerda tu elección.
 
-6. **Calculadora**: al lado de la tabla de tiempos, para las sumas y divisiones de
-   T<sub>R</sub>, T<sub>E</sub> y promedios. Se puede arrastrar desde su título y dejar
-   flotando en cualquier lado (⤓ la vuelve a acoplar) y minimizar con –.
+6. **Cola de listos**: al lado de la tabla de tiempos. En Automático muestra, instante
+   por instante, quiénes esperan la CPU y en qué orden los tomaría el planificador (sin
+   el que la está usando ni los que están en E/S) — es lo que hace falta para resolver
+   los empates. En Manual la completás vos y "Corregir" la revisa.
 
-7. **Bloques plegables**: Procesos, Algoritmo, Diagrama, Tiempos y el log se pliegan desde
+7. **Calculadora**: arriba a la derecha, junto a **Imagen**. Arranca cerrada; se abre con
+   el botón, se puede arrastrar desde su título para dejarla flotando en cualquier lado
+   (⤓ la vuelve a acoplar) y sirve para las cuentas de T<sub>R</sub>, T<sub>E</sub> y
+   promedios.
+
+8. **Bloques plegables**: Procesos, Algoritmo, Diagrama, Tiempos y el log se pliegan desde
    su título; el estado se recuerda. El desplegable **⏱ Instantes** ajusta el ancho del
    diagrama manual de a ±1, ±5 o ±10.
 
-8. **Celular**: la interfaz pasa a una columna; el diagrama se desplaza horizontalmente y
+9. **Celular**: la interfaz pasa a una columna; el diagrama se desplaza horizontalmente y
    se pinta tocando una celda (arrastrar con el dedo desplaza, no pinta).
 
 ## Importar y exportar
