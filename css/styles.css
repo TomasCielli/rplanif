@@ -97,10 +97,10 @@ code { background: var(--panel-3); padding: 1px 4px; border-radius: 3px; }
 .topbar p { margin: 0; opacity: .85; flex: 1; }
 .topbar .theme { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); color: #fff; padding: 4px 9px; font-size: 18px; line-height: 1; }
 .topbar .theme:hover { background: rgba(255,255,255,.22); }
-.disco { display: inline-block; animation: spin 6s linear infinite; }
-.disco.party { animation-duration: .4s; }
+.disco { display: inline-block; }
+.disco.party { animation: spin .4s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .disco { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .disco.party { animation: none; } }
 
 .layout { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 16px; padding: 16px; align-items: start; }
 .panel, .workspace { min-width: 0; }
