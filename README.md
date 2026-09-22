@@ -16,7 +16,9 @@ Abrí `index.html` en cualquier navegador. No hay que instalar nada.
 
    En las dos tablas (Procesos y Tiempos): con **◂ ▸** en el encabezado movés cada
    columna y el orden se recuerda, y **↑ ↓** (o Enter) recorren la columna en vez de
-   cambiar el número del campo. Tabla y código están sincronizados en los dos
+   cambiar el número del campo. Cada campo acepta sólo lo que puede contener: los
+   numéricos no admiten signo (no hay negativos) y están acotados, y los de texto
+   descartan los caracteres que el formato no entiende. Tabla y código están sincronizados en los dos
    sentidos: lo que tocás en la tabla genera el código, y el código cargado rellena la tabla.
 
    ```

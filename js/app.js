@@ -24,12 +24,52 @@
     return RESOURCE_COLORS[(i < 0 ? 0 : i) % RESOURCE_COLORS.length];
   }
 
+  // Límites de lo que se puede escribir. MAX_T acota el ancho del diagrama: sin tope, un
+  // Fin de cinco cifras intentaría dibujar decenas de miles de columnas.
+  var MAX_T = 500;        // instantes
+  var MAX_PRIO = 99;
+  var MAX_VALUE = 9999;   // tiempos calculados (TR, TE y promedios)
+
+  var CAPS = {
+    int:     /[^\d]/g,                          // sin signo ni punto: no hay negativos posibles
+    decimal: /[^\d.,]/g,
+    bursts:  /[^A-Za-z0-9_.\-,\[\] ]/g,
+    queue:   /[^A-Za-z0-9_.\- ,;]/g,
+    queues:  /[^0-9,\- ]/g,                     // quantums por cola: "8,16,-"
+    calc:    /[^0-9+\-*\/().,×÷− ]/g,
+  };
+
+  // Deja en el campo sólo lo que ese campo admite y respeta el máximo (data-max).
+  // Devuelve el texto ya saneado.
+  function capInput(inp) {
+    var kind = inp.dataset.cap;
+    if (!kind || !CAPS[kind]) return inp.value;
+    var before = inp.value;
+    var clean = before.replace(CAPS[kind], '');
+    if (kind === 'decimal') {                    // una sola coma decimal, siempre punto
+      clean = clean.replace(/,/g, '.');
+      var parts = clean.split('.');
+      clean = parts.shift() + (parts.length ? '.' + parts.join('') : '');
+    }
+    var max = parseFloat(inp.dataset.max);
+    if (!isNaN(max) && clean !== '' && clean !== '.' && parseFloat(clean) > max) clean = String(max);
+    if (clean !== before) {
+      var caret = inp.selectionStart;
+      inp.value = clean;
+      if (caret != null) {
+        caret = Math.max(0, caret - (before.length - clean.length));
+        try { inp.setSelectionRange(caret, caret); } catch (e) { /* algunos tipos no lo permiten */ }
+      }
+    }
+    return clean;
+  }
+
   // Columnas de la tabla de procesos (el enunciado).
   var COLUMNS = {
-    name:     { label: 'Job',     cls: 'num' },
-    arrival:  { label: 'Llegada', cls: 'num', type: 'number', min: 0 },
-    priority: { label: 'Prio',    cls: 'num', type: 'number' },
-    bursts:   { label: 'Ráfagas', cls: 'bursts', placeholder: '[CPU,3] [R1,2]' },
+    name:     { label: 'Job',     cls: 'num', maxlength: 12 },
+    arrival:  { label: 'Llegada', cls: 'num', cap: 'int', max: MAX_T },
+    priority: { label: 'Prio',    cls: 'num', cap: 'int', max: MAX_PRIO },
+    bursts:   { label: 'Ráfagas', cls: 'bursts', cap: 'bursts', maxlength: 200, placeholder: '[CPU,3] [R1,2]' },
   };
   var DEFAULT_COLUMNS = ['name', 'arrival', 'priority', 'bursts'];
   var COLUMNS_KEY = 'rplanif.columns';
@@ -40,9 +80,9 @@
     name:    { label: 'Proceso', td: 'name', value: function (p) { return escapeHtml(p.name); } },
     arrival: { label: 'Llegada', value: function (p) { return p.arrival; } },
     tcpu:    { label: 'T<sub>CPU</sub>', value: function (p) { return p.tcpu; } },
-    finish:  { label: 'Fin', input: 'finish', min: 0, title: 'Instante en que termina el proceso (equivale al ▼ del diagrama)', value: function (p) { return p.finish; } },
-    tr:      { label: 'T<sub>R</sub>', input: 'tr', value: function (p) { return p.tr; }, avg: function () { return state.auto.metrics.tpr; } },
-    te:      { label: 'T<sub>E</sub>', input: 'te', value: function (p) { return p.te; }, avg: function () { return state.auto.metrics.tpe; } },
+    finish:  { label: 'Fin', input: 'finish', cap: 'int', max: MAX_T, title: 'Instante en que termina el proceso (equivale al ▼ del diagrama)', value: function (p) { return p.finish; } },
+    tr:      { label: 'T<sub>R</sub>', input: 'tr', cap: 'decimal', max: MAX_VALUE, value: function (p) { return p.tr; }, avg: function () { return state.auto.metrics.tpr; } },
+    te:      { label: 'T<sub>E</sub>', input: 'te', cap: 'decimal', max: MAX_VALUE, value: function (p) { return p.te; }, avg: function () { return state.auto.metrics.tpe; } },
   };
   var DEFAULT_METRIC_COLUMNS = ['name', 'arrival', 'tcpu', 'finish', 'tr', 'te'];
   var METRIC_KEY = 'rplanif.metricColumns';
@@ -169,9 +209,9 @@
       showErrors([err.message]);
       return false;
     }
-    state.horizon = sameTasks
+    state.horizon = Math.min(MAX_T, sameTasks
       ? Math.max(state.horizon, state.auto.totalTime + 4, 16)
-      : Math.max(state.auto.totalTime + 4, 16);
+      : Math.max(state.auto.totalTime + 4, 16));
     if (state.brush.indexOf('io:') === 0 && def.resources.indexOf(state.brush.slice(3)) < 0) state.brush = 'cpu';
     render();
     return true;
@@ -192,6 +232,14 @@
     load('table');
   }
 
+  // Atributos comunes de un campo acotado (tipo de dato, tope y largo máximo).
+  function capAttrs(col) {
+    return (col.cap ? ' data-cap="' + col.cap + '"' : '')
+      + (col.cap === 'int' ? ' inputmode="numeric"' : col.cap === 'decimal' ? ' inputmode="decimal"' : '')
+      + (col.max !== undefined ? ' data-max="' + col.max + '"' : '')
+      + (col.maxlength ? ' maxlength="' + col.maxlength + '"' : '');
+  }
+
   function renderTable() {
     var tbl = $('proc-table');
     var order = columnOrder(COLUMNS_KEY, COLUMNS, DEFAULT_COLUMNS);
@@ -203,9 +251,7 @@
     state.table.tasks.forEach(function (t, i) {
       html += '<tr>' + order.map(function (c) {
         var col = COLUMNS[c];
-        return '<td><input class="' + col.cls + '"'
-          + (col.type ? ' type="' + col.type + '"' : '')
-          + (col.min !== undefined ? ' min="' + col.min + '"' : '')
+        return '<td><input class="' + col.cls + '"' + capAttrs(col)
           + (col.placeholder ? ' placeholder="' + col.placeholder + '"' : '')
           + (col.title ? ' title="' + col.title + '"' : '')
           + ' data-i="' + i + '" data-f="' + c + '" value="' + escapeAttr(t[c]) + '"></td>';
@@ -216,6 +262,7 @@
     tbl.querySelectorAll('input').forEach(function (inp) {
       inp.addEventListener('input', function () {
         var i = +inp.dataset.i, f = inp.dataset.f;
+        capInput(inp);
         var t = state.table.tasks[i];
         if (f === 'name') {
           var bad = QP.validateName(inp.value);
@@ -248,8 +295,9 @@
     else {
       var n = parseInt(raw, 10);
       if (isNaN(n) || n < 0) return;
+      n = Math.min(n, MAX_T);
       setMarker(pid, 'down', n);
-      state.horizon = Math.max(state.horizon, n + 1);
+      state.horizon = Math.min(MAX_T, Math.max(state.horizon, n + 1));
     }
     state.diff = null;
     render();                                  // render() rehace la tabla de tiempos…
@@ -549,7 +597,7 @@
     var rows = '';
     for (var t = 0; t < T; t++) {
       rows += '<tr><td class="t">' + t + '</td><td>' + (manual
-        ? '<input data-t="' + t + '" value="' + escapeAttr(state.ready[t] || '') + '" placeholder="—" autocomplete="off" spellcheck="false">'
+        ? '<input data-t="' + t + '" data-cap="queue" maxlength="60" value="' + escapeAttr(state.ready[t] || '') + '" placeholder="—" autocomplete="off" spellcheck="false">'
         : (queueNames(t) || '·')) + '</td></tr>';
     }
     box.innerHTML = '<table class="readyq-table"><thead><tr><th>t</th><th>Esperan la CPU</th></tr></thead><tbody>'
@@ -559,6 +607,7 @@
 
     box.querySelectorAll('input').forEach(function (inp) {
       inp.addEventListener('input', function () {
+        capInput(inp);
         if (inp.value.trim() === '') delete state.ready[inp.dataset.t];
         else state.ready[inp.dataset.t] = inp.value;
         inp.classList.remove('wrong', 'right');
@@ -588,8 +637,7 @@
         var col = METRIC_COLUMNS[c];
         if (!manual || !col.input) return '<td' + (col.td ? ' class="' + col.td + '"' : '') + '>' + col.value(p) + '</td>';
         var v = col.input === 'finish' ? markerAt(p.pid, 'down') : mm[col.input];
-        return '<td><input type="number"'
-          + (col.min !== undefined ? ' min="' + col.min + '"' : '')
+        return '<td><input' + capAttrs(col)
           + (col.title ? ' title="' + col.title + '"' : '')
           + ' data-pid="' + p.pid + '" data-m="' + col.input + '" value="' + (v == null ? '' : v) + '"></td>';
       }).join('') + '</tr>';
@@ -601,7 +649,7 @@
       if (c === 'name') return '<td class="name">Promedio</td>';
       if (!col.avg) return '<td></td>';
       if (!manual) return '<td>' + fmt(col.avg()) + '</td>';
-      return '<td><input type="number" step="0.01" data-pid="avg" data-m="' + col.input + '" value="' + (mt[col.input] == null ? '' : mt[col.input]) + '"></td>';
+      return '<td><input' + capAttrs(col) + ' data-pid="avg" data-m="' + col.input + '" value="' + (mt[col.input] == null ? '' : mt[col.input]) + '"></td>';
     }).join('') + '</tr></tbody></table>';
 
     if (manual) html += '<p class="hint"><b>Fin</b> es el instante en que termina el proceso: se completa sola al poner el ▼ en el diagrama, y si la escribís acá aparece el ▼. Los demás tiempos son opcionales; "Corregir" también los verifica. T<sub>E</sub> = T<sub>R</sub> − T<sub>CPU</sub>. Con ◂ ▸ movés las columnas y con ↑ ↓ recorrés la tabla.</p>';
@@ -609,6 +657,7 @@
 
     box.querySelectorAll('input').forEach(function (inp) {
       inp.addEventListener('input', function () {
+        capInput(inp);
         if (inp.dataset.m === 'finish') { editFinish(+inp.dataset.pid, inp.value); return; }
         var pid = inp.dataset.pid;
         state.manualMetrics[pid] = state.manualMetrics[pid] || {};
@@ -956,7 +1005,7 @@
     state.markers = m.markers || {};
     state.manualMetrics = m.metrics || {};
     state.ready = m.ready || {};
-    state.horizon = Math.max(m.horizon || 0, state.auto.totalTime + 4, 16);
+    state.horizon = Math.min(MAX_T, Math.max(m.horizon || 0, state.auto.totalTime + 4, 16));
     state.diff = null;
     render();
     return true;
@@ -1029,6 +1078,9 @@
   ['algorithm', 'quantum', 'preemptive', 'queues', 'preempted-order'].forEach(function (id) {
     $(id).addEventListener('change', function () { syncAlgorithmUI(); if (state.def) load('table'); });
   });
+  ['quantum', 'queues'].forEach(function (id) {
+    $(id).addEventListener('input', function () { capInput($(id)); });
+  });
   $('src-table').addEventListener('click', function () { setSource('table'); });
   $('src-code').addEventListener('click', function () { setSource('code'); });
   $('btn-load').addEventListener('click', function () { load('code'); });
@@ -1054,7 +1106,7 @@
   $('horizon-stepper').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-d]');
     if (!b) return;
-    state.horizon = Math.max(5, state.horizon + parseInt(b.dataset.d, 10));
+    state.horizon = Math.min(MAX_T, Math.max(5, state.horizon + parseInt(b.dataset.d, 10)));
     render();
   });
   // el desplegable se cierra al hacer clic afuera
@@ -1098,7 +1150,7 @@
       preview();
     }
 
-    expr.addEventListener('input', preview);
+    expr.addEventListener('input', function () { capInput(expr); preview(); });
     expr.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === '=') { e.preventDefault(); compute(); }
       if (e.key === 'Escape') { expr.value = ''; preview(); }
