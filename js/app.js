@@ -181,7 +181,6 @@
     $('mode-manual').classList.toggle('active', mode === 'manual');
     $('mode-auto').classList.toggle('active', mode === 'auto');
     $('manual-tools').classList.toggle('hidden', mode !== 'manual');
-    $('auto-tools').classList.toggle('hidden', mode !== 'auto');
     $('log-box').classList.toggle('hidden', mode !== 'auto');
     render();
   }
@@ -627,7 +626,6 @@
   $('btn-check').addEventListener('click', check);
   $('btn-clear').addEventListener('click', function () { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.diff = null; render(); });
   $('btn-more').addEventListener('click', function () { state.horizon += 5; render(); });
-  $('btn-run').addEventListener('click', function () { load('table'); });
 
   // arranque
   var saved = null;
