@@ -818,7 +818,7 @@
     if (themeClicks.length >= 4) {
       themeClicks = [];
       var disco = $('theme-toggle').querySelector('.disco');
-      disco.textContent = '🪩'; disco.classList.add('party');
+      disco.textContent = '💿'; disco.classList.add('party');
       setTimeout(function () { disco.classList.remove('party'); themeIcon(); }, 4000);
       window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1', '_blank', 'noopener');
     }
