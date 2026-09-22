@@ -163,7 +163,10 @@ details.popover > summary:hover { border-color: var(--muted); background: var(--
 .gantt .head { font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); position: relative; }
 .gantt .head.major { color: var(--text); font-weight: 600; }
 .gantt .head::before { content: ""; position: absolute; left: 0; bottom: 0; height: 4px; border-left: 1px solid var(--border); }
-.gantt .rowlabel { justify-content: flex-start; padding: 0 10px; font-weight: 600; white-space: nowrap; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--panel-2); position: sticky; left: 0; z-index: 5; }
+.gantt .rowlabel { justify-content: flex-start; padding: 0 10px; font-weight: 600; white-space: nowrap; border-bottom: 1px solid var(--border); background: var(--panel-2); position: sticky; left: 0; z-index: 5;
+  /* el borde transparente deja lugar a la mitad izquierda del marcador de t=0; la línea
+     divisoria se dibuja con un inset shadow para que quede en el borde visible */
+  border-right: 6px solid transparent; background-clip: padding-box; box-shadow: inset -1px 0 0 var(--border); }
 .gantt .rowlabel small { font-weight: 400; color: var(--muted); margin-left: 6px; }
 .gantt .cell { border-right: 1px dotted var(--border-soft); border-bottom: 1px solid var(--border); position: relative; }
 .gantt .cell.tick { border-right: 1px solid var(--border-tick); }
@@ -181,8 +184,6 @@ details.popover > summary:hover { border-color: var(--muted); background: var(--
 .cell.wrong::before { content: "✖"; position: absolute; top: 0; right: 2px; font-size: 9px; color: var(--bad); }
 /* marcadores sobre la línea de tiempo (en el borde izquierdo de la celda t) */
 .mk { position: absolute; left: -6px; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; z-index: 2; pointer-events: none; filter: drop-shadow(0 0 1px var(--panel)); }
-/* en t=0 no hay lugar a la izquierda (está la etiqueta fija): se dibuja entero adentro */
-.mk.first { left: 0; }
 .mk.up { bottom: 0; border-bottom: 8px solid var(--io); }
 .mk.down { top: 0; border-top: 8px solid var(--io); }
 .cell.summary .bar { display: none; }

@@ -410,10 +410,9 @@
 
   function fillCell(el, c, mk) {
     var style = c.s === 'io' ? ' style="background:' + resourceColor(c.r) + '"' : '';
-    var first = el.dataset.t === '0' ? ' first' : '';
     el.innerHTML = '<span class="bar ' + c.s + '"' + style + '>' + escapeHtml(cellLabel(c)) + '</span>'
-      + (mk.up ? '<i class="mk up' + first + '"></i>' : '')
-      + (mk.down ? '<i class="mk down' + first + '"></i>' : '');
+      + (mk.up ? '<i class="mk up"></i>' : '')
+      + (mk.down ? '<i class="mk down"></i>' : '');
   }
 
   function renderGantt(getCell, getMarkers, editable, T) {
@@ -856,7 +855,7 @@
       var y = y0 + headH + ri * rowH;
       // etiqueta
       ctx.fillStyle = row.summary ? C.panel3 : C.panel2;
-      ctx.fillRect(pad, y, labelW, rowH);
+      ctx.fillRect(pad, y, labelW - 6, rowH);          // 6px libres para el marcador de t=0
       ctx.textAlign = 'left'; ctx.fillStyle = C.text; ctx.font = 'bold 13px ' + FONT;
       ctx.fillText(row.label, pad + 10, y + rowH / 2);
       if (row.sub) {
@@ -901,7 +900,7 @@
       // marcadores (encima de las barras y separadores)
       if (!row.summary) {
         for (var t2 = 0; t2 < m.T; t2++) {
-          var mk = row.marks[t2], mx = x0 + t2 * cellW + (t2 === 0 ? 6 : 0);   // en t=0, entero dentro de la celda
+          var mk = row.marks[t2], mx = x0 + t2 * cellW;
           ctx.fillStyle = C.io;
           if (mk.up) { ctx.beginPath(); ctx.moveTo(mx - 6, y + rowH); ctx.lineTo(mx + 6, y + rowH); ctx.lineTo(mx, y + rowH - 8); ctx.closePath(); ctx.fill(); }
           if (mk.down) { ctx.beginPath(); ctx.moveTo(mx - 6, y); ctx.lineTo(mx + 6, y); ctx.lineTo(mx, y + 8); ctx.closePath(); ctx.fill(); }
