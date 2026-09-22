@@ -1,0 +1,8 @@
+#Colas multinivel: CPU bound vs E/S bound (probar con colas 2,4,- )
+RECURSO ''DISCO''
+TAREA ''A'' INICIO=0
+[CPU,12]
+TAREA ''B'' INICIO=1
+[CPU,1] [1,2] [CPU,1] [1,2] [CPU,1]
+TAREA ''C'' INICIO=2
+[CPU,6]

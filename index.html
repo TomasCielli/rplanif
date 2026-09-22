@@ -10,16 +10,18 @@
   <header class="topbar">
     <h1>rplanif</h1>
     <p>Planificación de CPU · diagrama de Gantt manual y automático</p>
+    <button id="theme-toggle" class="theme" title="Cambiar tema claro / oscuro">🌙 Oscuro</button>
   </header>
 
   <main class="layout">
     <aside class="panel">
       <section>
         <h2>1. Procesos</h2>
-        <label class="field">
-          <span>Ejemplos del apunte</span>
-          <select id="preset"></select>
-        </label>
+        <div class="file-row">
+          <button id="btn-import" title="Abrir un archivo .json exportado por rplanif, o un .txt con código qplanif">📂 Importar</button>
+          <button id="btn-export" title="Guardar procesos, algoritmo y diagrama manual en un .json">💾 Exportar</button>
+          <input type="file" id="file-input" accept=".json,.txt,.rplanif" class="hidden">
+        </div>
         <div class="segmented small" role="tablist">
           <button id="src-table" class="active" role="tab">Tabla</button>
           <button id="src-code" role="tab">Código</button>
@@ -102,13 +104,11 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
           <div id="brushes" class="brushes"></div>
           <span class="spacer"></span>
           <button id="btn-check" class="primary">Corregir</button>
-          <button id="btn-solution">Ver solución</button>
           <button id="btn-clear">Limpiar</button>
           <button id="btn-more" title="Agregar 5 columnas de tiempo">+5 instantes</button>
         </div>
         <div id="auto-tools" class="tools hidden">
           <button id="btn-run" class="primary">Resolver</button>
-          <button id="btn-copy-manual" title="Copiar la solución al modo manual">Copiar a manual</button>
         </div>
       </div>
 
@@ -129,6 +129,15 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
     </section>
   </main>
 
+  <script>
+    // Aplica el tema antes del primer pintado para evitar el destello claro.
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('rplanif.theme'); } catch (e) { /* sin storage */ }
+      if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+      if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    })();
+  </script>
   <script src="js/parser.js"></script>
   <script src="js/scheduler.js"></script>
   <script src="js/app.js"></script>

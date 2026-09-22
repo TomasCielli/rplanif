@@ -10,9 +10,9 @@ La idea: **dibujás el diagrama a mano, después lo corregís con el simulador.*
 
 Abrí `index.html` en cualquier navegador. No hay que instalar nada.
 
-1. **Procesos**: elegí un ejemplo del apunte, editá la **tabla** (Job, Llegada, Prio,
-   Ráfagas; agregar / eliminar procesos; recursos separados por coma) o escribí el
-   **código** con el formato de qplanif. Tabla y código están sincronizados en los dos
+1. **Procesos**: editá la **tabla** (Job, Llegada, Prio, Ráfagas; agregar / eliminar
+   procesos; recursos separados por coma), escribí el **código** con el formato de
+   qplanif, o **importá un archivo** (ver más abajo). Tabla y código están sincronizados en los dos
    sentidos: lo que tocás en la tabla genera el código, y el código cargado rellena la tabla.
 
    ```
@@ -37,6 +37,17 @@ Abrí `index.html` en cualquier navegador. No hay que instalar nada.
 
 4. **Automático**: muestra la solución completa (fila de CPU, filas por proceso con
    ▲ llegada y ▼ fin, filas por recurso, tiempos y log de eventos instante por instante).
+
+5. **Tema**: el botón de la barra superior alterna claro / oscuro. Por defecto sigue la
+   preferencia del sistema y recuerda tu elección.
+
+## Importar y exportar
+
+- **Exportar** guarda un `.json` con todo: procesos, algoritmo y sus parámetros, y el
+  diagrama manual (celdas, marcadores ▲▼ y tiempos cargados). Sirve para guardar un
+  ejercicio a medio hacer o pasárselo a alguien.
+- **Importar** acepta ese `.json`, o un `.txt` con código qplanif pelado (por ejemplo los
+  archivos de la cátedra). En `ejemplos/` están los del apunte listos para importar.
 
 ## Reglas que aplica el simulador
 

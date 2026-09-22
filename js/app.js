@@ -5,16 +5,8 @@
   var QP = window.RPlanif;
   var $ = function (id) { return document.getElementById(id); };
 
-  var PRESETS = [
-    { name: 'Ejemplo 1 — sólo CPU, con prioridades', text:
-      "#Ejemplo 1\nTAREA ''1'' PRIORIDAD=3\nINICIO=0 [CPU,9]\nTAREA ''2'' PRIORIDAD=2\nINICIO=1 [CPU,5]\nTAREA ''3'' PRIORIDAD=1\nINICIO=2 [CPU,3]\nTAREA ''4'' PRIORIDAD=2\nINICIO=3 [CPU,7]\n" },
-    { name: 'Ejemplo 2 — un recurso por proceso', text:
-      "#Ejemplo 2\nRECURSO ''R1''\nRECURSO ''R2''\nRECURSO ''R3''\nTAREA ''1'' INICIO=0\n[CPU,3] [1,2] [CPU,2]\nTAREA ''2'' INICIO=1\n[CPU,2] [2,2] [CPU,2]\nTAREA ''3'' INICIO=2\n[CPU,2] [3,3] [CPU,1]\n" },
-    { name: 'Ejemplo 3 — recurso compartido', text:
-      "#Ejemplo 3\nRECURSO ''R1''\nRECURSO ''R2''\nTAREA ''1'' INICIO=0\n[CPU,3] [1,3] [CPU,2]\nTAREA ''2'' INICIO=1\n[CPU,1] [1,2] [CPU,3]\nTAREA ''3'' INICIO=2\n[CPU,2] [2,3] [CPU,1]\n" },
-    { name: 'Colas multinivel — CPU bound vs E/S bound', text:
-      "#Multinivel (probar con Q0=RR q=2, Q1=RR q=4, Q2=FCFS)\nRECURSO ''DISCO''\nTAREA ''A'' INICIO=0\n[CPU,12]\nTAREA ''B'' INICIO=1\n[CPU,1] [1,2] [CPU,1] [1,2] [CPU,1]\nTAREA ''C'' INICIO=2\n[CPU,6]\n" },
-  ];
+  // Definición inicial (ejemplo 1 del apunte) para la primera vez que se abre la app.
+  var DEFAULT_DEFINITION = "#Ejemplo 1\nTAREA ''1'' PRIORIDAD=3\nINICIO=0 [CPU,9]\nTAREA ''2'' PRIORIDAD=2\nINICIO=1 [CPU,5]\nTAREA ''3'' PRIORIDAD=1\nINICIO=2 [CPU,3]\nTAREA ''4'' PRIORIDAD=2\nINICIO=3 [CPU,7]\n";
 
   var HINTS = {
     FIFO: 'Se elige el proceso más antiguo de la cola de listos. No apropiativo.',
@@ -81,7 +73,7 @@
     list.forEach(function (e) { var li = document.createElement('li'); li.textContent = e; ul.appendChild(li); });
   }
 
-  // source: 'code' (textarea/preset → también reconstruye la tabla) | 'table' (la tabla ya es la fuente)
+  // source: 'code' (textarea/archivo → también reconstruye la tabla) | 'table' (la tabla ya es la fuente)
   function load(source) {
     var def = QP.parse($('definition').value);
     showErrors(def.errors);
@@ -504,7 +496,7 @@
       var list = d.messages.slice(0, 25).concat(d.metricMsgs);
       html += '<ul>' + list.map(function (m) { return '<li>' + escapeHtml(m) + '</li>'; }).join('') + '</ul>';
       if (n > 25) html += '<p class="more">… y ' + (n - 25) + ' más. Las celdas marcadas en rojo muestran el detalle al pasar el mouse.</p>';
-      html += '<p class="hint">Tip: pasá a "Automático" para ver la solución completa con el log de eventos, o "Ver solución" para copiarla acá.</p>';
+      html += '<p class="hint">Tip: pasá a "Automático" para ver la solución completa con el log de eventos.</p>';
     }
     fb.innerHTML = html;
   }
@@ -514,20 +506,76 @@
     $('log').textContent = state.auto.events.map(function (e) { return 't=' + String(e.t).padStart(3, ' ') + '  ' + e.msg; }).join('\n');
   }
 
-  function copySolutionToManual() {
-    state.manual = {}; state.markers = {};
-    state.auto.procs.forEach(function (p) {
-      p.timeline.forEach(function (c, t) {
-        if (c.s === 'cpu') state.manual[p.pid + ':' + t] = { s: 'cpu' };
-        else if (c.s === 'io') state.manual[p.pid + ':' + t] = { s: 'io', r: c.r };
-      });
-      state.markers[p.pid + ':' + p.arrival] = Object.assign(state.markers[p.pid + ':' + p.arrival] || {}, { up: true });
-      state.markers[p.pid + ':' + p.finish] = Object.assign(state.markers[p.pid + ':' + p.finish] || {}, { down: true });
-      state.manualMetrics[p.pid] = { tr: p.tr, te: p.te };
-    });
-    state.manualMetrics.avg = { tr: state.auto.metrics.tpr, te: state.auto.metrics.tpe };
-    state.horizon = Math.max(state.horizon, state.auto.totalTime + 4);
+  /* ---------------- importar / exportar ---------------- */
+
+  // Instantánea completa: procesos, algoritmo y diagrama manual.
+  function snapshot() {
+    return {
+      app: 'rplanif', version: 1, savedAt: new Date().toISOString(),
+      definition: $('definition').value,
+      config: {
+        algorithm: $('algorithm').value, quantum: $('quantum').value, preemptive: $('preemptive').checked,
+        queues: $('queues').value, preemptedOrder: $('preempted-order').value,
+      },
+      manual: { cells: state.manual, markers: state.markers, metrics: state.manualMetrics, horizon: state.horizon },
+    };
+  }
+
+  function exportFile() {
+    var snap = snapshot();
+    var stamp = snap.savedAt.slice(0, 16).replace(/[-:T]/g, '').replace(/^(\d{8})(\d{4})$/, '$1-$2');
+    var blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'rplanif-' + stamp + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  function applySnapshot(snap) {
+    var c = snap.config || {};
+    if (c.algorithm && QP.ALGORITHMS[c.algorithm]) $('algorithm').value = c.algorithm;
+    if (c.quantum != null) $('quantum').value = c.quantum;
+    if (c.preemptive != null) $('preemptive').checked = !!c.preemptive;
+    if (c.queues != null) $('queues').value = c.queues;
+    if (c.preemptedOrder && QP.PREEMPTED_ORDERS[c.preemptedOrder]) $('preempted-order').value = c.preemptedOrder;
+    syncAlgorithmUI();
+    $('definition').value = snap.definition || '';
+    load('code');
+    if (!state.def) return;                         // el código del archivo tenía errores: quedan listados
+    var m = snap.manual || {};
+    state.manual = m.cells || {};
+    state.markers = m.markers || {};
+    state.manualMetrics = m.metrics || {};
+    state.horizon = Math.max(m.horizon || 0, state.auto.totalTime + 4, 16);
     state.diff = null;
+    render();
+  }
+
+  // Acepta un .json exportado por rplanif o un .txt con código qplanif.
+  function importText(text, name) {
+    var snap = null;
+    try { snap = JSON.parse(text); } catch (e) { /* no es JSON: lo trato como código */ }
+    if (snap && typeof snap === 'object' && snap.app === 'rplanif') {
+      applySnapshot(snap);
+    } else if (snap && typeof snap === 'object') {
+      showErrors(['El archivo "' + name + '" es JSON pero no fue generado por rplanif.']);
+      return;
+    } else {
+      $('definition').value = text;
+      load('code');
+      if (state.def) { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.diff = null; render(); }
+    }
+    setSource('table');
+  }
+
+  /* ---------------- tema ---------------- */
+
+  function applyTheme(theme) {
+    if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    $('theme-toggle').textContent = theme === 'dark' ? '☀️ Claro' : '🌙 Oscuro';
+    try { localStorage.setItem('rplanif.theme', theme); } catch (e) { /* sin storage */ }
   }
 
   /* ---------------- eventos ---------------- */
@@ -538,12 +586,17 @@
   Object.keys(QP.PREEMPTED_ORDERS).forEach(function (k) {
     var o = document.createElement('option'); o.value = k; o.textContent = QP.PREEMPTED_ORDERS[k]; $('preempted-order').appendChild(o);
   });
-  PRESETS.forEach(function (p, i) {
-    var o = document.createElement('option'); o.value = i; o.textContent = p.name; $('preset').appendChild(o);
+  $('btn-export').addEventListener('click', exportFile);
+  $('btn-import').addEventListener('click', function () { $('file-input').value = ''; $('file-input').click(); });
+  $('file-input').addEventListener('change', function () {
+    var f = $('file-input').files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () { importText(String(reader.result), f.name); };
+    reader.readAsText(f);
   });
-  $('preset').addEventListener('change', function () {
-    $('definition').value = PRESETS[$('preset').value].text;
-    load('code');
+  $('theme-toggle').addEventListener('click', function () {
+    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
   });
   ['algorithm', 'quantum', 'preemptive', 'queues', 'preempted-order'].forEach(function (id) {
     $(id).addEventListener('change', function () { syncAlgorithmUI(); if (state.def) load('table'); });
@@ -560,8 +613,6 @@
   $('mode-manual').addEventListener('click', function () { setMode('manual'); });
   $('mode-auto').addEventListener('click', function () { setMode('auto'); });
   $('btn-check').addEventListener('click', check);
-  $('btn-solution').addEventListener('click', function () { copySolutionToManual(); render(); });
-  $('btn-copy-manual').addEventListener('click', function () { copySolutionToManual(); setMode('manual'); });
   $('btn-clear').addEventListener('click', function () { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.diff = null; render(); });
   $('btn-more').addEventListener('click', function () { state.horizon += 5; render(); });
   $('btn-run').addEventListener('click', function () { load('table'); });
@@ -573,7 +624,8 @@
     var savedOrder = localStorage.getItem('rplanif.preemptedOrder');
     if (savedOrder && QP.PREEMPTED_ORDERS[savedOrder]) $('preempted-order').value = savedOrder;
   } catch (e) { /* sin storage */ }
-  $('definition').value = saved || PRESETS[0].text;
+  $('definition').value = saved || DEFAULT_DEFINITION;
+  $('theme-toggle').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️ Claro' : '🌙 Oscuro';
   syncAlgorithmUI();
   load('code');
 })();
