@@ -64,6 +64,7 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
         <label class="check" id="preemptive-row">
           <input type="checkbox" id="preemptive"> Apropiativo (preemptive)
         </label>
+        <!-- sólo para colas multinivel (oculto mientras ALGORITHMS.MLFQ.hidden sea true) -->
         <label class="field" id="queues-row">
           <span>Colas: quantum de cada una, <code>-</code> = FCFS</span>
           <input type="text" id="queues" value="8,16,-">
@@ -85,8 +86,9 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
             <li>Desempate: orden de llegada al sistema (INICIO), luego PID.</li>
             <li>RR con <strong>timer variable</strong>: el contador arranca en Q cada vez que un proceso toma la CPU. Si el expulsado por quantum coincide con llegadas o retornos de E/S, se encola según la opción elegida (por defecto: se ordena con ellos por llegada y PID).</li>
             <li>Prioridades: <strong>menor valor = mayor prioridad</strong>.</li>
-            <li>Los apropiativos (SRTF, Prioridades apropiativo, colas multinivel) sólo expulsan si el candidato es estrictamente mejor; en empate sigue el que está.</li>
-            <li>Multinivel: los procesos entran en Q0; al agotar el quantum bajan una cola. Una cola superior expulsa a una inferior.</li>
+            <li>Los apropiativos (SRTF, Prioridades apropiativo) sólo expulsan si el candidato es estrictamente mejor; en empate sigue el que está.</li>
+            <!-- Colas multinivel: oculto (ver ALGORITHMS.MLFQ.hidden en js/scheduler.js)
+            <li>Multinivel: los procesos entran en Q0; al agotar el quantum bajan una cola. Una cola superior expulsa a una inferior.</li> -->
             <li>T<sub>R</sub> = fin − llegada · T<sub>E</sub> = T<sub>R</sub> − T<sub>CPU</sub> (tal como lo define el apunte).</li>
           </ul>
         </details>

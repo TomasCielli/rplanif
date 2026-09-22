@@ -25,8 +25,9 @@ Abrí `index.html` en cualquier navegador. No hay que instalar nada.
    - `[k,n]` E/S de *n* instantes en el *k*-ésimo recurso declarado (también vale `[R1,n]`).
    - `#` comentario. `PRIORIDAD` e `INICIO` valen 0 si no se indican.
 
-2. **Algoritmo**: FIFO, SJF, SRTF, Round Robin (quantum), Prioridades (apropiativo o
-   no) o Colas multinivel con retroalimentación (quantum por cola, `-` = FCFS).
+2. **Algoritmo**: FIFO, SJF, SRTF, Round Robin (quantum) o Prioridades (apropiativo o
+   no). Las colas multinivel están implementadas pero ocultas porque la práctica de la
+   comisión no las usa (`ALGORITHMS.MLFQ.hidden` en `js/scheduler.js`).
 
 3. **Manual**: elegí un pincel (CPU, E/S en cada recurso, ▲ Llegada, ▼ Fin, Borrar) y
    pintá las celdas con clic o arrastrando. Los marcadores se colocan de a uno sobre el
@@ -61,16 +62,15 @@ en `js/scheduler.js`.
 - Desempate: orden de llegada al sistema (`INICIO`), después PID (orden de declaración).
 - **RR, timer variable**: el contador arranca en Q cada vez que un proceso toma la CPU.
   Si el expulsado por quantum coincide en el mismo instante con llegadas o retornos de
-  E/S, se encola según la opción *"Expulsado por quantum…"* (también aplica a las colas
-  multinivel):
+  E/S, se encola según la opción *"Expulsado por quantum…"*:
   - **Por desempate** (default): se ordena junto con ellos por llegada al sistema y luego
     PID — en la práctica, el más viejo primero.
   - **Al final**: detrás de los que entran en ese instante.
   - **Primero**: delante de los que entran en ese instante.
 - **Prioridades**: menor valor = mayor prioridad.
-- Los apropiativos (SRTF, Prioridades apropiativo, multinivel) sólo expulsan si el
+- Los apropiativos (SRTF, Prioridades apropiativo) sólo expulsan si el
   candidato es *estrictamente* mejor; en empate sigue el que está.
-- **Multinivel**: los procesos entran en Q0; al agotar el quantum bajan una cola; una
+- **Multinivel** (oculto en la interfaz): los procesos entran en Q0; al agotar el quantum bajan una cola; una
   cola superior expulsa a una inferior (el expulsado conserva su quantum restante).
 - T<sub>R</sub> = fin − llegada · T<sub>E</sub> = T<sub>R</sub> − T<sub>CPU</sub> · TPR / TPE = promedios.
 

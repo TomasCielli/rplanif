@@ -29,7 +29,9 @@
     SRTF:     { label: 'SRTF — Shortest Remaining Time First', quantum: false, preemptive: true },
     RR:       { label: 'Round Robin (timer variable)',         quantum: true,  preemptive: false },
     PRIORITY: { label: 'Prioridades',                          quantum: false, preemptive: 'optional' },
-    MLFQ:     { label: 'Colas multinivel con retroalimentación', quantum: 'queues', preemptive: true },
+    // Colas multinivel: implementado y testeado, pero OCULTO en la interfaz porque la
+    // práctica de la comisión no lo usa y confunde. Para habilitarlo: hidden: false.
+    MLFQ:     { label: 'Colas multinivel con retroalimentación', quantum: 'queues', preemptive: true, hidden: true },
   };
 
   var DEFAULT_QUEUES = [{ quantum: 8 }, { quantum: 16 }, { quantum: null }];

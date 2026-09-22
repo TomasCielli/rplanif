@@ -17,6 +17,13 @@
     MLFQ: 'Q0, Q1, … cada una con su quantum (RR) o FCFS. Al agotar el quantum el proceso baja de cola. Una cola superior expulsa a una inferior.',
   };
 
+  // Un color por recurso de E/S, asignado por orden de declaración (R1 celeste como en el PDF).
+  var RESOURCE_COLORS = ['#22b8cf', '#845ef7', '#40c057', '#f06595', '#f59f00', '#12b886', '#4c6ef5', '#be4bdb'];
+  function resourceColor(name) {
+    var i = state.def ? state.def.resources.indexOf(name) : -1;
+    return RESOURCE_COLORS[(i < 0 ? 0 : i) % RESOURCE_COLORS.length];
+  }
+
   var state = {
     def: null, cfg: null, auto: null,
     // modelo editable de la tabla: bursts como string con el formato de entrada
@@ -224,25 +231,27 @@
     var box = $('brushes');
     box.innerHTML = '';
     var brushes = [{ id: 'cpu', label: 'CPU', swatch: 'bar cpu' }];
-    state.def.resources.forEach(function (r) { brushes.push({ id: 'io:' + r, label: 'E/S ' + r, swatch: 'bar io' }); });
+    state.def.resources.forEach(function (r) { brushes.push({ id: 'io:' + r, label: 'E/S ' + r, swatch: 'bar io', color: resourceColor(r) }); });
     brushes.push({ id: 'up', label: 'Llegada', swatch: 'mk up' });
     brushes.push({ id: 'down', label: 'Fin', swatch: 'mk down' });
     brushes.push({ id: 'erase', label: 'Borrar', swatch: 'bar' });
     brushes.forEach(function (b) {
       var btn = document.createElement('button');
       btn.className = 'brush' + (state.brush === b.id ? ' active' : '');
-      btn.innerHTML = '<span class="swatch ' + b.swatch + '"></span>' + b.label;
+      btn.innerHTML = '<span class="swatch ' + b.swatch + '"' + (b.color ? ' style="background:' + b.color + '"' : '') + '></span>' + b.label;
       btn.addEventListener('click', function () { state.brush = b.id; renderBrushes(); });
       box.appendChild(btn);
     });
   }
 
   function renderLegend() {
-    var items = [['bar cpu', 'Uso de CPU'], ['bar io', 'E/S'], ['mk up', 'Llegada al sistema'], ['mk down', 'Fin del proceso']];
+    var items = [['bar cpu', 'Uso de CPU']];
+    state.def.resources.forEach(function (r) { items.push(['bar io', 'E/S ' + r, resourceColor(r)]); });
+    items.push(['mk up', 'Llegada al sistema'], ['mk down', 'Fin del proceso']);
     if (state.mode === 'auto') items.push(['bar wait', 'Bloqueado esperando el recurso'], ['bar ready', 'Listo (esperando CPU)']);
     else items.push(['wrong', 'Incorrecto (después de corregir)']);
     $('legend').innerHTML = items.map(function (it) {
-      return '<span><i class="' + it[0] + '"></i>' + it[1] + '</span>';
+      return '<span><i class="' + it[0] + '"' + (it[2] ? ' style="background:' + it[2] + '"' : '') + '></i>' + it[1] + '</span>';
     }).join('');
   }
 
@@ -253,7 +262,8 @@
   }
 
   function fillCell(el, c, mk) {
-    el.innerHTML = '<span class="bar ' + c.s + '">' + escapeHtml(cellLabel(c)) + '</span>'
+    var style = c.s === 'io' ? ' style="background:' + resourceColor(c.r) + '"' : '';
+    el.innerHTML = '<span class="bar ' + c.s + '"' + style + '>' + escapeHtml(cellLabel(c)) + '</span>'
       + (mk.up ? '<i class="mk up"></i>' : '')
       + (mk.down ? '<i class="mk down"></i>' : '');
   }
@@ -545,7 +555,7 @@
 
   function applySnapshot(snap) {
     var c = snap.config || {};
-    if (c.algorithm && QP.ALGORITHMS[c.algorithm]) $('algorithm').value = c.algorithm;
+    if (c.algorithm && QP.ALGORITHMS[c.algorithm] && !QP.ALGORITHMS[c.algorithm].hidden) $('algorithm').value = c.algorithm;
     if (c.quantum != null) $('quantum').value = c.quantum;
     if (c.preemptive != null) $('preemptive').checked = !!c.preemptive;
     if (c.queues != null) $('queues').value = c.queues;
@@ -592,6 +602,7 @@
   /* ---------------- eventos ---------------- */
 
   Object.keys(QP.ALGORITHMS).forEach(function (k) {
+    if (QP.ALGORITHMS[k].hidden) return;
     var o = document.createElement('option'); o.value = k; o.textContent = QP.ALGORITHMS[k].label; $('algorithm').appendChild(o);
   });
   Object.keys(QP.PREEMPTED_ORDERS).forEach(function (k) {
