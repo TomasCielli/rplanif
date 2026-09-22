@@ -780,7 +780,7 @@
   function applyTheme(theme) {
     if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     else document.documentElement.removeAttribute('data-theme');
-    $('theme-toggle').textContent = theme === 'dark' ? '☀️ Claro' : '🌙 Oscuro';
+    $('theme-toggle').title = theme === 'dark' ? 'Tema oscuro (clic para claro)' : 'Tema claro (clic para oscuro)';
     try { localStorage.setItem('rplanif.theme', theme); } catch (e) { /* sin storage */ }
   }
 
@@ -802,8 +802,19 @@
     reader.onload = function () { importText(String(reader.result), f.name); };
     reader.readAsText(f);
   });
+  var themeClicks = [];
   $('theme-toggle').addEventListener('click', function () {
     applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    var now = Date.now();
+    themeClicks = themeClicks.filter(function (t) { return now - t < 3000; });
+    themeClicks.push(now);
+    if (themeClicks.length >= 4) {
+      themeClicks = [];
+      var disco = $('theme-toggle').querySelector('.disco');
+      disco.classList.add('party');
+      setTimeout(function () { disco.classList.remove('party'); }, 4000);
+      window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1', '_blank', 'noopener');
+    }
   });
   ['algorithm', 'quantum', 'preemptive', 'queues', 'preempted-order'].forEach(function (id) {
     $(id).addEventListener('change', function () { syncAlgorithmUI(); if (state.def) load('table'); });
@@ -972,7 +983,7 @@
   })();
 
   // arranque
-  $('theme-toggle').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️ Claro' : '🌙 Oscuro';
+  $('theme-toggle').title = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Tema oscuro (clic para claro)' : 'Tema claro (clic para oscuro)';
   var restored = false;
   try {
     var raw = localStorage.getItem('rplanif.snapshot');

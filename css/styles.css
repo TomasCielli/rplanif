@@ -95,8 +95,12 @@ code { background: var(--panel-3); padding: 1px 4px; border-radius: 3px; }
 .topbar { background: linear-gradient(var(--topbar-1), var(--topbar-2)); color: #fff; padding: 12px 24px; border-bottom: 4px solid var(--accent); display: flex; align-items: center; gap: 18px; }
 .topbar h1 { font-size: 26px; font-style: italic; }
 .topbar p { margin: 0; opacity: .85; flex: 1; }
-.topbar .theme { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); color: #fff; padding: 5px 10px; }
+.topbar .theme { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); color: #fff; padding: 4px 9px; font-size: 18px; line-height: 1; }
 .topbar .theme:hover { background: rgba(255,255,255,.22); }
+.disco { display: inline-block; animation: spin 6s linear infinite; }
+.disco.party { animation-duration: .4s; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .disco { animation: none; } }
 
 .layout { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 16px; padding: 16px; align-items: start; }
 .panel, .workspace { min-width: 0; }
