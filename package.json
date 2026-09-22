@@ -4,6 +4,6 @@
   "description": "Simulador de planificación de CPU: diagrama de Gantt manual y automático",
   "private": true,
   "scripts": {
-    "test": "node --test tests/scheduler.test.js"
+    "test": "node --test"
   }
 }

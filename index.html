@@ -118,8 +118,25 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
       <div id="feedback" class="feedback hidden"></div>
 
       <section class="metrics-box">
-        <h2>Tiempos</h2>
-        <div id="metrics"></div>
+        <div class="metrics-row">
+          <div>
+            <h2>Tiempos</h2>
+            <div id="metrics"></div>
+          </div>
+          <div class="calc" id="calc">
+            <h2>Calculadora</h2>
+            <input type="text" id="calc-expr" placeholder="(9+13+15+21)/4" autocomplete="off" spellcheck="false">
+            <div id="calc-result" class="calc-result">&nbsp;</div>
+            <div class="calc-keys" id="calc-keys">
+              <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="÷" class="op">÷</button>
+              <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="×" class="op">×</button>
+              <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k="−" class="op">−</button>
+              <button data-k="0">0</button><button data-k=",">,</button><button data-k="(" class="op">(</button><button data-k="+" class="op">+</button>
+              <button data-k=")" class="op">)</button><button data-a="clear" class="op" title="Borrar todo">C</button><button data-a="back" class="op" title="Borrar el último carácter">⌫</button><button data-a="eq" class="eq" title="Calcular (Enter)">=</button>
+            </div>
+            <ul id="calc-history" class="calc-history" title="Clic en un resultado para reutilizarlo"></ul>
+          </div>
+        </div>
       </section>
 
       <details id="log-box" class="help hidden">
@@ -140,6 +157,7 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
   </script>
   <script src="js/parser.js"></script>
   <script src="js/scheduler.js"></script>
+  <script src="js/calc.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

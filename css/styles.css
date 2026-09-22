@@ -202,3 +202,20 @@ textarea { width: 100%; font-family: Consolas, "Courier New", monospace; font-si
 .proc-table .del { padding: 2px 7px; color: var(--bad); border-color: transparent; font-size: 14px; line-height: 1; }
 .proc-table .del:hover { border-color: var(--bad); background: var(--bad-bg); }
 .proc-table .empty-row td { color: var(--muted); font-style: italic; padding: 8px 4px; }
+
+/* ---------- Minicalculadora ---------- */
+.metrics-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.metrics-row > div:first-child { flex: 0 1 auto; min-width: 0; }
+.metrics-row .hint { max-width: 460px; margin-top: 6px; }
+.calc { width: 232px; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--panel-2); }
+.calc input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-family: Consolas, "Courier New", monospace; font-size: 14px; text-align: right; }
+.calc-result { font-size: 20px; font-weight: 600; text-align: right; min-height: 28px; margin: 4px 0 6px; font-variant-numeric: tabular-nums; }
+.calc-result.err { font-size: 12px; font-weight: 400; color: var(--muted); }
+.calc-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.calc-keys button { padding: 6px 0; font-size: 14px; }
+.calc-keys .op { background: var(--panel-3); }
+.calc-keys .eq { background: var(--accent); border-color: var(--accent-dark); color: var(--accent-text); }
+.calc-history { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12px; color: var(--muted); max-height: 84px; overflow: auto; font-variant-numeric: tabular-nums; }
+.calc-history li { cursor: pointer; display: flex; justify-content: space-between; gap: 8px; padding: 1px 2px; border-radius: 3px; }
+.calc-history li:hover { background: var(--panel-3); color: var(--text); }
+.calc-history li b { font-weight: 600; }

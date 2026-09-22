@@ -1,5 +1,5 @@
 'use strict';
-// Ejecutar con:  node --test tests/
+// Ejecutar con:  npm test
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { parse, serialize, burstsToString, validateName } = require('../js/parser.js');

@@ -87,7 +87,8 @@ index.html        interfaz
 css/styles.css
 js/parser.js      formato de entrada ⇄ {resources, tasks} (parse / serialize)
 js/scheduler.js   motor de planificación (sin DOM, testeable)
-js/app.js         modo manual / automático, corrección
+js/calc.js        evaluador aritmético de la minicalculadora (sin eval)
+js/app.js         modo manual / automático, corrección, calculadora
 tests/            tests del motor contra los ejemplos del apunte
 ```
 

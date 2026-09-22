@@ -812,6 +812,71 @@
   $('btn-clear').addEventListener('click', function () { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.diff = null; render(); });
   $('btn-more').addEventListener('click', function () { state.horizon += 5; render(); });
 
+  /* ---------------- minicalculadora ---------------- */
+
+  (function calculator() {
+    var expr = $('calc-expr'), result = $('calc-result'), history = $('calc-history');
+    var entries = [];
+
+    function fmtNum(n) { return String(Math.round(n * 100) / 100).replace('.', ','); }
+
+    function preview() {
+      var text = expr.value;
+      if (!text.trim()) { result.innerHTML = '&nbsp;'; result.classList.remove('err'); return; }
+      var v = QP.evaluate(text);
+      if (v === null) { result.textContent = 'expresión incompleta'; result.classList.add('err'); }
+      else { result.textContent = fmtNum(v); result.classList.remove('err'); }
+    }
+
+    function insert(text) {
+      var s = expr.selectionStart, e = expr.selectionEnd, v = expr.value;
+      expr.value = v.slice(0, s) + text + v.slice(e);
+      expr.selectionStart = expr.selectionEnd = s + text.length;
+      preview();
+    }
+
+    function compute() {
+      var v = QP.evaluate(expr.value);
+      if (v === null) { preview(); return; }
+      entries.unshift({ expr: expr.value.trim(), value: v });
+      entries = entries.slice(0, 6);
+      history.innerHTML = entries.map(function (en, i) {
+        return '<li data-i="' + i + '"><span>' + escapeHtml(en.expr) + '</span><b>= ' + fmtNum(en.value) + '</b></li>';
+      }).join('');
+      expr.value = fmtNum(v);          // el resultado queda para encadenar operaciones
+      preview();
+    }
+
+    expr.addEventListener('input', preview);
+    expr.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === '=') { e.preventDefault(); compute(); }
+      if (e.key === 'Escape') { expr.value = ''; preview(); }
+    });
+    // mousedown + preventDefault: los botones no roban el foco del campo
+    $('calc-keys').addEventListener('mousedown', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      e.preventDefault();
+      expr.focus();
+      if (b.dataset.k) insert(b.dataset.k);
+      else if (b.dataset.a === 'clear') { expr.value = ''; preview(); }
+      else if (b.dataset.a === 'back') {
+        var s = expr.selectionStart, en = expr.selectionEnd;
+        if (s === en && s > 0) s--;
+        expr.value = expr.value.slice(0, s) + expr.value.slice(en);
+        expr.selectionStart = expr.selectionEnd = s;
+        preview();
+      }
+      else if (b.dataset.a === 'eq') compute();
+    });
+    history.addEventListener('click', function (e) {
+      var li = e.target.closest('li');
+      if (!li) return;
+      expr.focus();
+      insert(fmtNum(entries[+li.dataset.i].value));
+    });
+  })();
+
   // arranque
   $('theme-toggle').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️ Claro' : '🌙 Oscuro';
   var restored = false;
