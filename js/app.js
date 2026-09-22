@@ -81,20 +81,17 @@
   }
 
   // source: 'code' (textarea/archivo → también reconstruye la tabla) | 'table' (la tabla ya es la fuente)
+  // Devuelve true si la definición se cargó (sin errores de parseo ni de simulación).
   function load(source) {
     var def = QP.parse($('definition').value);
     showErrors(def.errors);
-    if (def.errors.length) return;
+    if (def.errors.length) return false;
 
     if (source !== 'table') { tableFromDef(def); renderTable(); }
 
-    try {
-      localStorage.setItem('rplanif.definition', $('definition').value);
-      localStorage.setItem('rplanif.preemptedOrder', $('preempted-order').value);
-    } catch (e) { /* sin storage */ }
-
-    var names = function (d) { return JSON.stringify(d.tasks.map(function (t) { return t.name; })); };
-    var sameTasks = state.def && names(state.def) === names(def);
+    // El diagrama manual está indexado por posición (pid), así que sobrevive a renombrar o
+    // editar atributos; sólo se descarta si cambia la cantidad de procesos.
+    var sameTasks = !!state.def && state.def.tasks.length === def.tasks.length;
     if (!sameTasks) { state.manual = {}; state.markers = {}; state.manualMetrics = {}; }
 
     state.def = def;
@@ -105,13 +102,14 @@
     } catch (err) {
       state.auto = null;
       showErrors([err.message]);
-      return;
+      return false;
     }
     state.horizon = sameTasks
       ? Math.max(state.horizon, state.auto.totalTime + 4, 16)
       : Math.max(state.auto.totalTime + 4, 16);
     if (state.brush.indexOf('io:') === 0 && def.resources.indexOf(state.brush.slice(3)) < 0) state.brush = 'cpu';
     render();
+    return true;
   }
 
   function tableFromDef(def) {
@@ -192,8 +190,13 @@
     render();
   }
 
+  function persist() {
+    try { localStorage.setItem('rplanif.snapshot', JSON.stringify(snapshot())); } catch (e) { /* sin storage */ }
+  }
+
   function render() {
     if (!state.def || !state.auto) return;
+    persist();
     if (!state.def.tasks.length) { renderEmpty(); return; }
     $('status').textContent = describeConfig(state.cfg) + (state.mode === 'manual'
       ? ' — dibujá el diagrama y apretá "Corregir".'
@@ -348,6 +351,7 @@
     }
     fillCell(cellEl, manualCell(+cellEl.dataset.pid, +cellEl.dataset.t), manualMarkers(+cellEl.dataset.pid, +cellEl.dataset.t));
     if (state.diff) { state.diff = null; renderFeedback(); clearWrongMarks(); }
+    persist();
   }
 
   function clearWrongMarks() {
@@ -368,6 +372,7 @@
     paint(e.target.closest('.cell'), true);
   });
   window.addEventListener('mouseup', function () { state.painting = false; });
+  document.addEventListener('mouseleave', function () { state.painting = false; });
 
   /* ---------------- métricas ---------------- */
 
@@ -405,6 +410,7 @@
         state.manualMetrics[pid] = state.manualMetrics[pid] || {};
         state.manualMetrics[pid][inp.dataset.m] = inp.value === '' ? null : parseFloat(inp.value);
         inp.classList.remove('wrong', 'right');
+        persist();
       });
     });
     if (state.diff) markMetricInputs();
@@ -562,8 +568,7 @@
     if (c.preemptedOrder && QP.PREEMPTED_ORDERS[c.preemptedOrder]) $('preempted-order').value = c.preemptedOrder;
     syncAlgorithmUI();
     $('definition').value = snap.definition || '';
-    load('code');
-    if (!state.def) return;                         // el código del archivo tenía errores: quedan listados
+    if (!load('code')) return false;                // el código del archivo tenía errores: quedan listados
     var m = snap.manual || {};
     state.manual = m.cells || {};
     state.markers = m.markers || {};
@@ -571,6 +576,7 @@
     state.horizon = Math.max(m.horizon || 0, state.auto.totalTime + 4, 16);
     state.diff = null;
     render();
+    return true;
   }
 
   // Acepta un .json exportado por rplanif o un .txt con código qplanif.
@@ -584,8 +590,7 @@
       return;
     } else {
       $('definition').value = text;
-      load('code');
-      if (state.def) { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.diff = null; render(); }
+      if (load('code')) { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.diff = null; render(); }
     }
     setSource('table');
   }
@@ -639,14 +644,27 @@
   $('btn-more').addEventListener('click', function () { state.horizon += 5; render(); });
 
   // arranque
-  var saved = null;
-  try {
-    saved = localStorage.getItem('rplanif.definition');
-    var savedOrder = localStorage.getItem('rplanif.preemptedOrder');
-    if (savedOrder && QP.PREEMPTED_ORDERS[savedOrder]) $('preempted-order').value = savedOrder;
-  } catch (e) { /* sin storage */ }
-  $('definition').value = saved !== null ? saved : DEFAULT_DEFINITION;
   $('theme-toggle').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️ Claro' : '🌙 Oscuro';
-  syncAlgorithmUI();
-  load('code');
+  var restored = false;
+  try {
+    var raw = localStorage.getItem('rplanif.snapshot');
+    if (raw) {
+      restored = applySnapshot(JSON.parse(raw));
+    } else {
+      // versiones anteriores guardaban sólo la definición
+      var legacy = localStorage.getItem('rplanif.definition');
+      if (legacy !== null) {
+        var legacyOrder = localStorage.getItem('rplanif.preemptedOrder');
+        if (legacyOrder && QP.PREEMPTED_ORDERS[legacyOrder]) $('preempted-order').value = legacyOrder;
+        $('definition').value = legacy;
+        syncAlgorithmUI();
+        restored = load('code');
+      }
+    }
+  } catch (e) { restored = false; }
+  if (!restored) {
+    $('definition').value = DEFAULT_DEFINITION;
+    syncAlgorithmUI();
+    load('code');
+  }
 })();
