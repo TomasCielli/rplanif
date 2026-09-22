@@ -10,15 +10,13 @@ La idea: **dibujás el diagrama a mano, después lo corregís con el simulador.*
 
 Abrí `index.html` en cualquier navegador. No hay que instalar nada.
 
-1. **Procesos**: editá la **tabla** (Job, Llegada, Prio, Ráfagas, Fin; agregar / eliminar
+1. **Procesos**: editá la **tabla** (Job, Llegada, Prio, Ráfagas; agregar / eliminar
    procesos; recursos separados por coma), escribí el **código** con el formato de
    qplanif, o **importá un archivo** (ver más abajo).
 
-   - **Fin** no es parte del enunciado: es tu respuesta. Se completa sola cuando ponés el
-     ▼ en el diagrama, y si la escribís acá aparece el ▼ en ese instante (son la misma
-     cosa vista de dos formas).
-   - Con **◂ ▸** en el encabezado movés cada columna; el orden se recuerda.
-   - **↑ ↓** (y Enter) recorren la tabla en vez de cambiar el número del campo. Tabla y código están sincronizados en los dos
+   En las dos tablas (Procesos y Tiempos): con **◂ ▸** en el encabezado movés cada
+   columna y el orden se recuerda, y **↑ ↓** (o Enter) recorren la columna en vez de
+   cambiar el número del campo. Tabla y código están sincronizados en los dos
    sentidos: lo que tocás en la tabla genera el código, y el código cargado rellena la tabla.
 
    ```
@@ -38,9 +36,11 @@ Abrí `index.html` en cualquier navegador. No hay que instalar nada.
 3. **Manual**: elegí un pincel (CPU, E/S en cada recurso, ▲ Llegada, ▼ Fin, Borrar) y
    pintá las celdas con clic o arrastrando. Los marcadores se colocan de a uno sobre el
    borde izquierdo de la celda: ▲ en el instante en que el proceso llega al sistema y
-   ▼ en el instante en que termina (como en el qplanif original). Opcionalmente cargá
-   los T<sub>R</sub> / T<sub>E</sub> que calculaste. Apretá **Corregir**: las celdas y
-   marcadores mal quedan en rojo con la explicación de qué tenía que pasar.
+   ▼ en el instante en que termina (como en el qplanif original). Completá los tiempos en
+   la tabla de **Tiempos**: la columna **Fin** y el ▼ son la misma cosa vista de dos
+   formas (poner el ▼ la completa, y escribirla coloca el ▼); T<sub>R</sub> y T<sub>E</sub>
+   son opcionales. Apretá **Corregir**: las celdas, los marcadores y los tiempos mal
+   quedan en rojo con la explicación de qué tenía que pasar.
 
 4. **Automático**: muestra la solución completa (fila de CPU, filas por proceso con
    ▲ llegada y ▼ fin, filas por recurso, tiempos y log de eventos instante por instante).

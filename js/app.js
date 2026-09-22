@@ -24,28 +24,67 @@
     return RESOURCE_COLORS[(i < 0 ? 0 : i) % RESOURCE_COLORS.length];
   }
 
-  // Columnas de la tabla de procesos. 'finish' no es parte de la definición: es la
-  // respuesta del alumno, y vive en los marcadores ▼ del diagrama.
+  // Columnas de la tabla de procesos (el enunciado).
   var COLUMNS = {
     name:     { label: 'Job',     cls: 'num' },
     arrival:  { label: 'Llegada', cls: 'num', type: 'number', min: 0 },
     priority: { label: 'Prio',    cls: 'num', type: 'number' },
     bursts:   { label: 'Ráfagas', cls: 'bursts', placeholder: '[CPU,3] [R1,2]' },
-    finish:   { label: 'Fin',     cls: 'num', type: 'number', min: 0, title: 'Instante en que termina el proceso (equivale al ▼ del diagrama)' },
   };
-  var DEFAULT_COLUMNS = ['name', 'arrival', 'priority', 'bursts', 'finish'];
+  var DEFAULT_COLUMNS = ['name', 'arrival', 'priority', 'bursts'];
+  var COLUMNS_KEY = 'rplanif.columns';
 
-  function columnOrder() {
+  // Columnas de la tabla de tiempos. 'finish' es la respuesta del alumno y vive en los
+  // marcadores ▼ del diagrama; 'tr' y 'te' en state.manualMetrics.
+  var METRIC_COLUMNS = {
+    name:    { label: 'Proceso', td: 'name', value: function (p) { return escapeHtml(p.name); } },
+    arrival: { label: 'Llegada', value: function (p) { return p.arrival; } },
+    tcpu:    { label: 'T<sub>CPU</sub>', value: function (p) { return p.tcpu; } },
+    finish:  { label: 'Fin', input: 'finish', min: 0, title: 'Instante en que termina el proceso (equivale al ▼ del diagrama)', value: function (p) { return p.finish; } },
+    tr:      { label: 'T<sub>R</sub>', input: 'tr', value: function (p) { return p.tr; }, avg: function () { return state.auto.metrics.tpr; } },
+    te:      { label: 'T<sub>E</sub>', input: 'te', value: function (p) { return p.te; }, avg: function () { return state.auto.metrics.tpe; } },
+  };
+  var DEFAULT_METRIC_COLUMNS = ['name', 'arrival', 'tcpu', 'finish', 'tr', 'te'];
+  var METRIC_KEY = 'rplanif.metricColumns';
+
+  // Orden guardado de una tabla: ignora columnas desconocidas y agrega al final las nuevas.
+  function columnOrder(key, columns, defaults) {
     var saved = null;
-    try { saved = JSON.parse(localStorage.getItem('rplanif.columns') || 'null'); } catch (e) { /* sin storage */ }
-    if (!Array.isArray(saved)) return DEFAULT_COLUMNS.slice();
-    var order = saved.filter(function (c) { return COLUMNS[c]; });
-    DEFAULT_COLUMNS.forEach(function (c) { if (order.indexOf(c) < 0) order.push(c); });  // columnas nuevas al final
+    try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { /* sin storage */ }
+    if (!Array.isArray(saved)) return defaults.slice();
+    var order = saved.filter(function (c) { return columns[c]; });
+    defaults.forEach(function (c) { if (order.indexOf(c) < 0) order.push(c); });
     return order;
   }
 
-  function saveColumnOrder(order) {
-    try { localStorage.setItem('rplanif.columns', JSON.stringify(order)); } catch (e) { /* sin storage */ }
+  function moveColumn(key, columns, defaults, name, dir) {
+    var o = columnOrder(key, columns, defaults), i = o.indexOf(name), j = i + dir;
+    if (i < 0 || j < 0 || j >= o.length) return false;
+    o[i] = o[j]; o[j] = name;
+    try { localStorage.setItem(key, JSON.stringify(o)); } catch (e) { /* sin storage */ }
+    return true;
+  }
+
+  function headerCells(order, columns) {
+    return order.map(function (c, k) {
+      return '<th><span class="colhead">'
+        + '<button class="mv" data-c="' + c + '" data-d="-1" title="Mover a la izquierda"' + (k === 0 ? ' disabled' : '') + '>◂</button>'
+        + columns[c].label
+        + '<button class="mv" data-c="' + c + '" data-d="1" title="Mover a la derecha"' + (k === order.length - 1 ? ' disabled' : '') + '>▸</button>'
+        + '</span></th>';
+    }).join('');
+  }
+
+  // ↑ ↓ (y Enter) recorren la columna en vez de cambiar el número del campo.
+  function arrowNav(container, e, attr) {
+    var inp = e.target.closest('input');
+    if (!inp) return;
+    var d = (e.key === 'ArrowDown' || e.key === 'Enter') ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    var same = [].slice.call(container.querySelectorAll('input[' + attr + '="' + inp.getAttribute(attr) + '"]'));
+    var next = same[same.indexOf(inp) + d];
+    if (next) { next.focus(); next.select(); }
   }
 
   var state = {
@@ -153,28 +192,21 @@
 
   function renderTable() {
     var tbl = $('proc-table');
-    var order = columnOrder();
+    var order = columnOrder(COLUMNS_KEY, COLUMNS, DEFAULT_COLUMNS);
     $('resources-input').value = state.table.resources.join(', ');
 
-    var html = '<thead><tr>' + order.map(function (c, k) {
-      return '<th><span class="colhead">'
-        + '<button class="mv" data-c="' + c + '" data-d="-1" title="Mover a la izquierda"' + (k === 0 ? ' disabled' : '') + '>◂</button>'
-        + COLUMNS[c].label
-        + '<button class="mv" data-c="' + c + '" data-d="1" title="Mover a la derecha"' + (k === order.length - 1 ? ' disabled' : '') + '>▸</button>'
-        + '</span></th>';
-    }).join('') + '<th></th></tr></thead><tbody>';
+    var html = '<thead><tr>' + headerCells(order, COLUMNS) + '<th></th></tr></thead><tbody>';
 
     if (!state.table.tasks.length) html += '<tr class="empty-row"><td colspan="' + (order.length + 1) + '">Sin procesos. Agregá uno.</td></tr>';
     state.table.tasks.forEach(function (t, i) {
       html += '<tr>' + order.map(function (c) {
         var col = COLUMNS[c];
-        var value = c === 'finish' ? (markerAt(i + 1, 'down') == null ? '' : markerAt(i + 1, 'down')) : t[c];
         return '<td><input class="' + col.cls + '"'
           + (col.type ? ' type="' + col.type + '"' : '')
           + (col.min !== undefined ? ' min="' + col.min + '"' : '')
           + (col.placeholder ? ' placeholder="' + col.placeholder + '"' : '')
           + (col.title ? ' title="' + col.title + '"' : '')
-          + ' data-i="' + i + '" data-f="' + c + '" value="' + escapeAttr(value) + '"></td>';
+          + ' data-i="' + i + '" data-f="' + c + '" value="' + escapeAttr(t[c]) + '"></td>';
       }).join('') + '<td><button class="del" data-i="' + i + '" title="Eliminar proceso">✕</button></td></tr>';
     });
     tbl.innerHTML = html + '</tbody>';
@@ -182,7 +214,6 @@
     tbl.querySelectorAll('input').forEach(function (inp) {
       inp.addEventListener('input', function () {
         var i = +inp.dataset.i, f = inp.dataset.f;
-        if (f === 'finish') { editFinish(i + 1, inp.value); return; }
         var t = state.table.tasks[i];
         if (f === 'name') {
           var bad = QP.validateName(inp.value);
@@ -203,11 +234,7 @@
     });
     tbl.querySelectorAll('.mv').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        var o = columnOrder(), i = o.indexOf(btn.dataset.c), j = i + (+btn.dataset.d);
-        if (i < 0 || j < 0 || j >= o.length) return;
-        o[i] = o[j]; o[j] = btn.dataset.c;
-        saveColumnOrder(o);
-        renderTable();
+        if (moveColumn(COLUMNS_KEY, COLUMNS, DEFAULT_COLUMNS, btn.dataset.c, +btn.dataset.d)) renderTable();
       });
     });
   }
@@ -223,7 +250,9 @@
       state.horizon = Math.max(state.horizon, n + 1);
     }
     state.diff = null;
-    render();
+    render();                                  // render() rehace la tabla de tiempos…
+    var inp = document.querySelector('#metrics input[data-pid="' + pid + '"][data-m="finish"]');
+    if (inp) inp.focus();                      // …así que devolvemos el foco al campo
   }
 
   function addTask() {
@@ -326,9 +355,9 @@
 
   // Refleja en la columna Fin el marcador ▼ (sin pisar el campo que estás editando).
   function syncFinishInputs() {
-    document.querySelectorAll('#proc-table input[data-f="finish"]').forEach(function (inp) {
+    document.querySelectorAll('#metrics input[data-m="finish"]').forEach(function (inp) {
       if (document.activeElement === inp) return;
-      var t = markerAt(+inp.dataset.i + 1, 'down');
+      var t = markerAt(+inp.dataset.pid, 'down');
       inp.value = t == null ? '' : t;
     });
   }
@@ -501,39 +530,48 @@
 
   function renderMetrics() {
     var box = $('metrics');
-    var procs = state.auto.procs;
     var manual = state.mode === 'manual';
-    var html = '<table><thead><tr><th>Proceso</th><th>Llegada</th><th>T<sub>CPU</sub></th><th>T<sub>R</sub></th><th>T<sub>E</sub></th></tr></thead><tbody>';
-    procs.forEach(function (p) {
+    var order = columnOrder(METRIC_KEY, METRIC_COLUMNS, DEFAULT_METRIC_COLUMNS);
+
+    var html = '<table><thead><tr>' + headerCells(order, METRIC_COLUMNS) + '</tr></thead><tbody>';
+    state.auto.procs.forEach(function (p) {
       var mm = state.manualMetrics[p.pid] || {};
-      html += '<tr><td class="name">' + escapeHtml(p.name) + '</td><td>' + p.arrival + '</td><td>' + p.tcpu + '</td>';
-      if (manual) {
-        html += '<td><input type="number" data-pid="' + p.pid + '" data-m="tr" value="' + (mm.tr == null ? '' : mm.tr) + '"></td>'
-              + '<td><input type="number" data-pid="' + p.pid + '" data-m="te" value="' + (mm.te == null ? '' : mm.te) + '"></td>';
-      } else {
-        html += '<td>' + p.tr + '</td><td>' + p.te + '</td>';
-      }
-      html += '</tr>';
+      html += '<tr>' + order.map(function (c) {
+        var col = METRIC_COLUMNS[c];
+        if (!manual || !col.input) return '<td' + (col.td ? ' class="' + col.td + '"' : '') + '>' + col.value(p) + '</td>';
+        var v = col.input === 'finish' ? markerAt(p.pid, 'down') : mm[col.input];
+        return '<td><input type="number"'
+          + (col.min !== undefined ? ' min="' + col.min + '"' : '')
+          + (col.title ? ' title="' + col.title + '"' : '')
+          + ' data-pid="' + p.pid + '" data-m="' + col.input + '" value="' + (v == null ? '' : v) + '"></td>';
+      }).join('') + '</tr>';
     });
-    if (manual) {
-      var mt = state.manualMetrics.avg || {};
-      html += '<tr class="avg"><td class="name">Promedio</td><td></td><td></td>'
-            + '<td><input type="number" step="0.01" data-pid="avg" data-m="tr" value="' + (mt.tr == null ? '' : mt.tr) + '"></td>'
-            + '<td><input type="number" step="0.01" data-pid="avg" data-m="te" value="' + (mt.te == null ? '' : mt.te) + '"></td></tr>';
-    } else {
-      html += '<tr class="avg"><td class="name">Promedio</td><td></td><td></td><td>' + fmt(state.auto.metrics.tpr) + '</td><td>' + fmt(state.auto.metrics.tpe) + '</td></tr>';
-    }
-    html += '</tbody></table>';
-    if (manual) html += '<p class="hint">Completá los tiempos que calculaste (opcional): "Corregir" también los verifica. T<sub>E</sub> = T<sub>R</sub> − T<sub>CPU</sub>. Para editar los procesos usá la tabla del panel izquierdo.</p>';
+
+    var mt = state.manualMetrics.avg || {};
+    html += '<tr class="avg">' + order.map(function (c) {
+      var col = METRIC_COLUMNS[c];
+      if (c === 'name') return '<td class="name">Promedio</td>';
+      if (!col.avg) return '<td></td>';
+      if (!manual) return '<td>' + fmt(col.avg()) + '</td>';
+      return '<td><input type="number" step="0.01" data-pid="avg" data-m="' + col.input + '" value="' + (mt[col.input] == null ? '' : mt[col.input]) + '"></td>';
+    }).join('') + '</tr></tbody></table>';
+
+    if (manual) html += '<p class="hint"><b>Fin</b> es el instante en que termina el proceso: se completa sola al poner el ▼ en el diagrama, y si la escribís acá aparece el ▼. Los demás tiempos son opcionales; "Corregir" también los verifica. T<sub>E</sub> = T<sub>R</sub> − T<sub>CPU</sub>. Con ◂ ▸ movés las columnas y con ↑ ↓ recorrés la tabla.</p>';
     box.innerHTML = html;
 
     box.querySelectorAll('input').forEach(function (inp) {
       inp.addEventListener('input', function () {
+        if (inp.dataset.m === 'finish') { editFinish(+inp.dataset.pid, inp.value); return; }
         var pid = inp.dataset.pid;
         state.manualMetrics[pid] = state.manualMetrics[pid] || {};
         state.manualMetrics[pid][inp.dataset.m] = inp.value === '' ? null : parseFloat(inp.value);
         inp.classList.remove('wrong', 'right');
         persist();
+      });
+    });
+    box.querySelectorAll('.mv').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (moveColumn(METRIC_KEY, METRIC_COLUMNS, DEFAULT_METRIC_COLUMNS, btn.dataset.c, +btn.dataset.d)) renderMetrics();
       });
     });
     if (state.diff) markMetricInputs();
@@ -607,6 +645,8 @@
     var metrics = {};
     var metricMsgs = [];
     auto.procs.forEach(function (p) {
+      var fin = markerAt(p.pid, 'down');
+      if (fin != null) metrics[p.pid + ':finish'] = fin === p.finish;
       var mm = state.manualMetrics[p.pid] || {};
       [['tr', p.tr, 'T_R'], ['te', p.te, 'T_E']].forEach(function (m) {
         if (mm[m[0]] == null) return;
@@ -942,16 +982,8 @@
   });
   $('btn-image').addEventListener('click', exportImage);
   $('btn-add-task').addEventListener('click', addTask);
-  // ↑ ↓ (y Enter) recorren la tabla en vez de cambiar el número del campo
-  $('proc-table').addEventListener('keydown', function (e) {
-    var inp = e.target.closest('input');
-    if (!inp) return;
-    var d = (e.key === 'ArrowDown' || e.key === 'Enter') ? 1 : e.key === 'ArrowUp' ? -1 : 0;
-    if (!d) return;
-    e.preventDefault();
-    var next = $('proc-table').querySelector('input[data-f="' + inp.dataset.f + '"][data-i="' + (+inp.dataset.i + d) + '"]');
-    if (next) { next.focus(); next.select(); }
-  });
+  $('proc-table').addEventListener('keydown', function (e) { arrowNav($('proc-table'), e, 'data-f'); });
+  $('metrics').addEventListener('keydown', function (e) { arrowNav($('metrics'), e, 'data-m'); });
   $('mode-manual').addEventListener('click', function () { setMode('manual'); });
   $('mode-auto').addEventListener('click', function () { setMode('auto'); });
   $('btn-check').addEventListener('click', check);
