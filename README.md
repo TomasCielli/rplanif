@@ -10,9 +10,15 @@ La idea: **dibujás el diagrama a mano, después lo corregís con el simulador.*
 
 Abrí `index.html` en cualquier navegador. No hay que instalar nada.
 
-1. **Procesos**: editá la **tabla** (Job, Llegada, Prio, Ráfagas; agregar / eliminar
+1. **Procesos**: editá la **tabla** (Job, Llegada, Prio, Ráfagas, Fin; agregar / eliminar
    procesos; recursos separados por coma), escribí el **código** con el formato de
-   qplanif, o **importá un archivo** (ver más abajo). Tabla y código están sincronizados en los dos
+   qplanif, o **importá un archivo** (ver más abajo).
+
+   - **Fin** no es parte del enunciado: es tu respuesta. Se completa sola cuando ponés el
+     ▼ en el diagrama, y si la escribís acá aparece el ▼ en ese instante (son la misma
+     cosa vista de dos formas).
+   - Con **◂ ▸** en el encabezado movés cada columna; el orden se recuerda.
+   - **↑ ↓** (y Enter) recorren la tabla en vez de cambiar el número del campo. Tabla y código están sincronizados en los dos
    sentidos: lo que tocás en la tabla genera el código, y el código cargado rellena la tabla.
 
    ```
@@ -87,6 +93,7 @@ en `js/scheduler.js`.
 - **Prioridades**: menor valor = mayor prioridad.
 - Los apropiativos (SRTF, Prioridades apropiativo) sólo expulsan si el
   candidato es *estrictamente* mejor; en empate sigue el que está.
+- Cada proceso puede tener **un solo ▲ y un solo ▼**: al poner uno nuevo se mueve el anterior.
 - **Multinivel** (oculto en la interfaz): los procesos entran en Q0; al agotar el quantum bajan una cola; una
   cola superior expulsa a una inferior (el expulsado conserva su quantum restante).
 - T<sub>R</sub> = fin − llegada · T<sub>E</sub> = T<sub>R</sub> − T<sub>CPU</sub> · TPR / TPE = promedios.

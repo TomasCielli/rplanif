@@ -288,3 +288,11 @@ details.popover > summary:hover { border-color: var(--muted); background: var(--
   input, select, textarea, .proc-table input, .metrics-box input, .calc input { font-size: 16px; }
   .proc-table input.num { width: 44px; }
 }
+
+/* ---------- Cabecera de la tabla: reordenar columnas ---------- */
+.colhead { display: inline-flex; align-items: center; gap: 1px; white-space: nowrap; }
+.colhead .mv { padding: 0 2px; border: 0; background: transparent; color: var(--muted); font-size: 11px; line-height: 1; opacity: 0; transition: opacity .12s; }
+.proc-table:hover .colhead .mv, .colhead .mv:focus-visible { opacity: 1; }
+.colhead .mv:hover { color: var(--text); background: var(--panel-3); border-radius: 3px; }
+.colhead .mv[disabled] { visibility: hidden; }
+@media (max-width: 900px) { .colhead .mv { opacity: 1; } }

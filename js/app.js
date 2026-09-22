@@ -24,6 +24,30 @@
     return RESOURCE_COLORS[(i < 0 ? 0 : i) % RESOURCE_COLORS.length];
   }
 
+  // Columnas de la tabla de procesos. 'finish' no es parte de la definición: es la
+  // respuesta del alumno, y vive en los marcadores ▼ del diagrama.
+  var COLUMNS = {
+    name:     { label: 'Job',     cls: 'num' },
+    arrival:  { label: 'Llegada', cls: 'num', type: 'number', min: 0 },
+    priority: { label: 'Prio',    cls: 'num', type: 'number' },
+    bursts:   { label: 'Ráfagas', cls: 'bursts', placeholder: '[CPU,3] [R1,2]' },
+    finish:   { label: 'Fin',     cls: 'num', type: 'number', min: 0, title: 'Instante en que termina el proceso (equivale al ▼ del diagrama)' },
+  };
+  var DEFAULT_COLUMNS = ['name', 'arrival', 'priority', 'bursts', 'finish'];
+
+  function columnOrder() {
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem('rplanif.columns') || 'null'); } catch (e) { /* sin storage */ }
+    if (!Array.isArray(saved)) return DEFAULT_COLUMNS.slice();
+    var order = saved.filter(function (c) { return COLUMNS[c]; });
+    DEFAULT_COLUMNS.forEach(function (c) { if (order.indexOf(c) < 0) order.push(c); });  // columnas nuevas al final
+    return order;
+  }
+
+  function saveColumnOrder(order) {
+    try { localStorage.setItem('rplanif.columns', JSON.stringify(order)); } catch (e) { /* sin storage */ }
+  }
+
   var state = {
     def: null, cfg: null, auto: null,
     // modelo editable de la tabla: bursts como string con el formato de entrada
@@ -129,28 +153,41 @@
 
   function renderTable() {
     var tbl = $('proc-table');
+    var order = columnOrder();
     $('resources-input').value = state.table.resources.join(', ');
-    var html = '<thead><tr><th>Job</th><th>Llegada</th><th>Prio</th><th>Ráfagas</th><th></th></tr></thead><tbody>';
-    if (!state.table.tasks.length) html += '<tr class="empty-row"><td colspan="5">Sin procesos. Agregá uno.</td></tr>';
+
+    var html = '<thead><tr>' + order.map(function (c, k) {
+      return '<th><span class="colhead">'
+        + '<button class="mv" data-c="' + c + '" data-d="-1" title="Mover a la izquierda"' + (k === 0 ? ' disabled' : '') + '>◂</button>'
+        + COLUMNS[c].label
+        + '<button class="mv" data-c="' + c + '" data-d="1" title="Mover a la derecha"' + (k === order.length - 1 ? ' disabled' : '') + '>▸</button>'
+        + '</span></th>';
+    }).join('') + '<th></th></tr></thead><tbody>';
+
+    if (!state.table.tasks.length) html += '<tr class="empty-row"><td colspan="' + (order.length + 1) + '">Sin procesos. Agregá uno.</td></tr>';
     state.table.tasks.forEach(function (t, i) {
-      html += '<tr>'
-        + '<td><input class="num" data-i="' + i + '" data-f="name" value="' + escapeAttr(t.name) + '"></td>'
-        + '<td><input class="num" type="number" min="0" data-i="' + i + '" data-f="arrival" value="' + t.arrival + '"></td>'
-        + '<td><input class="num" type="number" data-i="' + i + '" data-f="priority" value="' + t.priority + '"></td>'
-        + '<td><input class="bursts" data-i="' + i + '" data-f="bursts" value="' + escapeAttr(t.bursts) + '" placeholder="[CPU,3] [R1,2]"></td>'
-        + '<td><button class="del" data-i="' + i + '" title="Eliminar proceso">✕</button></td>'
-        + '</tr>';
+      html += '<tr>' + order.map(function (c) {
+        var col = COLUMNS[c];
+        var value = c === 'finish' ? (markerAt(i + 1, 'down') == null ? '' : markerAt(i + 1, 'down')) : t[c];
+        return '<td><input class="' + col.cls + '"'
+          + (col.type ? ' type="' + col.type + '"' : '')
+          + (col.min !== undefined ? ' min="' + col.min + '"' : '')
+          + (col.placeholder ? ' placeholder="' + col.placeholder + '"' : '')
+          + (col.title ? ' title="' + col.title + '"' : '')
+          + ' data-i="' + i + '" data-f="' + c + '" value="' + escapeAttr(value) + '"></td>';
+      }).join('') + '<td><button class="del" data-i="' + i + '" title="Eliminar proceso">✕</button></td></tr>';
     });
     tbl.innerHTML = html + '</tbody>';
 
     tbl.querySelectorAll('input').forEach(function (inp) {
       inp.addEventListener('input', function () {
-        var t = state.table.tasks[+inp.dataset.i];
-        var f = inp.dataset.f;
+        var i = +inp.dataset.i, f = inp.dataset.f;
+        if (f === 'finish') { editFinish(i + 1, inp.value); return; }
+        var t = state.table.tasks[i];
         if (f === 'name') {
           var bad = QP.validateName(inp.value);
           inp.classList.toggle('invalid', !!bad);
-          if (bad) { showErrors([bad + ' (proceso ' + (+inp.dataset.i + 1) + ')']); return; }
+          if (bad) { showErrors([bad + ' (proceso ' + (i + 1) + ')']); return; }
         }
         if (f === 'arrival' || f === 'priority') t[f] = parseInt(inp.value, 10) || 0;
         else t[f] = inp.value.trim();
@@ -164,6 +201,29 @@
         tableToCode();
       });
     });
+    tbl.querySelectorAll('.mv').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var o = columnOrder(), i = o.indexOf(btn.dataset.c), j = i + (+btn.dataset.d);
+        if (i < 0 || j < 0 || j >= o.length) return;
+        o[i] = o[j]; o[j] = btn.dataset.c;
+        saveColumnOrder(o);
+        renderTable();
+      });
+    });
+  }
+
+  // La columna Fin escribe el marcador ▼ del proceso.
+  function editFinish(pid, raw) {
+    raw = String(raw).trim();
+    if (raw === '') setMarker(pid, 'down', null);
+    else {
+      var n = parseInt(raw, 10);
+      if (isNaN(n) || n < 0) return;
+      setMarker(pid, 'down', n);
+      state.horizon = Math.max(state.horizon, n + 1);
+    }
+    state.diff = null;
+    render();
   }
 
   function addTask() {
@@ -216,6 +276,7 @@
     renderMetrics();
     renderFeedback();
     renderLog();
+    syncFinishInputs();
   }
 
   // Sin procesos: no hay nada que dibujar ni corregir.
@@ -233,6 +294,43 @@
   function renderHorizon() {
     $('horizon-count').textContent = state.horizon;
     $('horizon-value').textContent = state.horizon;
+  }
+
+  // Instante del marcador (▲ 'up' / ▼ 'down') de un proceso, o null si no está puesto.
+  function markerAt(pid, kind) {
+    var found = null;
+    Object.keys(state.markers).forEach(function (k) {
+      var parts = k.split(':');
+      if (+parts[0] === pid && state.markers[k][kind]) found = +parts[1];
+    });
+    return found;
+  }
+
+  // Coloca (o quita, con t = null) el marcador. Sólo puede haber uno por proceso y tipo.
+  function setMarker(pid, kind, t) {
+    Object.keys(state.markers).forEach(function (k) {
+      if (+k.split(':')[0] !== pid || !state.markers[k][kind]) return;
+      delete state.markers[k][kind];
+      if (!state.markers[k].up && !state.markers[k].down) delete state.markers[k];
+    });
+    if (t == null) return;
+    var key = pid + ':' + t;
+    state.markers[key] = state.markers[key] || {};
+    state.markers[key][kind] = true;
+  }
+
+  function refreshCell(pid, t) {
+    var el = document.querySelector('.cell[data-pid="' + pid + '"][data-t="' + t + '"]');
+    if (el) fillCell(el, manualCell(pid, t), manualMarkers(pid, t));
+  }
+
+  // Refleja en la columna Fin el marcador ▼ (sin pisar el campo que estás editando).
+  function syncFinishInputs() {
+    document.querySelectorAll('#proc-table input[data-f="finish"]').forEach(function (inp) {
+      if (document.activeElement === inp) return;
+      var t = markerAt(+inp.dataset.i + 1, 'down');
+      inp.value = t == null ? '' : t;
+    });
   }
 
   function manualCell(pid, t) { return state.manual[pid + ':' + t] || { s: 'none' }; }
@@ -353,12 +451,15 @@
 
     if (b === 'up' || b === 'down') {
       if (isDrag) return;                       // los marcadores se colocan de a uno (toggle)
-      var mk = state.markers[key] || {};
-      mk[b] = !mk[b];
-      if (!mk.up && !mk.down) delete state.markers[key]; else state.markers[key] = mk;
+      var pid = +cellEl.dataset.pid, t = +cellEl.dataset.t;
+      var prev = markerAt(pid, b);
+      setMarker(pid, b, prev === t ? null : t);
+      if (prev != null && prev !== t) refreshCell(pid, prev);   // el anterior se fue de su celda
+      syncFinishInputs();
     } else if (b === 'erase') {
       delete state.manual[key];
       delete state.markers[key];
+      syncFinishInputs();
     } else {
       state.manual[key] = b === 'cpu' ? { s: 'cpu' } : { s: 'io', r: b.slice(3) };
     }
@@ -841,6 +942,16 @@
   });
   $('btn-image').addEventListener('click', exportImage);
   $('btn-add-task').addEventListener('click', addTask);
+  // ↑ ↓ (y Enter) recorren la tabla en vez de cambiar el número del campo
+  $('proc-table').addEventListener('keydown', function (e) {
+    var inp = e.target.closest('input');
+    if (!inp) return;
+    var d = (e.key === 'ArrowDown' || e.key === 'Enter') ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    var next = $('proc-table').querySelector('input[data-f="' + inp.dataset.f + '"][data-i="' + (+inp.dataset.i + d) + '"]');
+    if (next) { next.focus(); next.select(); }
+  });
   $('mode-manual').addEventListener('click', function () { setMode('manual'); });
   $('mode-auto').addEventListener('click', function () { setMode('auto'); });
   $('btn-check').addEventListener('click', check);

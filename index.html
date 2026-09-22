@@ -34,7 +34,7 @@
           </label>
           <table class="proc-table" id="proc-table"></table>
           <button id="btn-add-task" class="wide">+ Agregar proceso</button>
-          <p class="hint">Ráfagas: <code>[CPU,3] [R1,2] [CPU,2]</code> — CPU o nombre/índice del recurso, y duración. Los cambios se aplican al instante y generan el código.</p>
+          <p class="hint">Ráfagas: <code>[CPU,3] [R1,2] [CPU,2]</code> — CPU o nombre/índice del recurso, y duración. <b>Fin</b> es tu respuesta: se completa sola al poner el ▼ en el diagrama, o la escribís acá. Con ◂ ▸ movés las columnas y con ↑ ↓ recorrés la tabla.</p>
         </div>
 
         <div id="code-view" class="hidden">
@@ -80,7 +80,7 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
         <details class="help" id="sec-reglas">
           <summary>Reglas que aplica el simulador</summary>
           <ul>
-            <li>▲ marca la llegada del proceso al sistema (INICIO); ▼ marca el instante en que termina por completo. Ambos van sobre la línea de tiempo, no dentro de una celda.</li>
+            <li>▲ marca la llegada del proceso al sistema (INICIO); ▼ marca el instante en que termina por completo. Ambos van sobre la línea de tiempo, no dentro de una celda, y hay uno solo de cada por proceso (poner otro mueve el anterior).</li>
             <li>Instante <em>t</em> = intervalo [t, t+1). Una ráfaga que termina al final de <em>t</em> deja al proceso listo desde <em>t+1</em>.</li>
             <li>E/S en paralelo con la CPU. Cada recurso atiende de a uno, con cola FIFO. Si el recurso está ocupado, el proceso <strong>espera bloqueado</strong>.</li>
             <li>Desempate: orden de llegada al sistema (INICIO), luego PID.</li>
