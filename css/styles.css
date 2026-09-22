@@ -318,7 +318,3 @@ table:hover .colhead .mv, .colhead .mv:focus-visible { opacity: 1; }
 .readyq-table input:focus { border-color: var(--border); background: var(--panel); }
 .metrics-box .readyq-table input.wrong { border-color: var(--bad); background: var(--bad-bg); }
 .metrics-box .readyq-table input.right { border-color: var(--ok); background: var(--ok-bg); }
-
-/* ---------- Pie ---------- */
-.credits { padding: 4px 16px 20px; font-size: 12px; color: var(--muted); text-align: center; }
-.credits a { color: inherit; }
