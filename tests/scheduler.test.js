@@ -81,7 +81,18 @@ test('parser: errores claros', () => {
   const def = parse(`TAREA ''X'' INICIO=0 [7,3]`);
   assert.ok(def.errors.some((e) => /recurso "7" no definido/.test(e)));
   assert.ok(parse('[CPU,3]').errors.some((e) => /fuera de una TAREA/.test(e)));
-  assert.ok(parse('').errors.length > 0);
+});
+
+test('una definición sin procesos es un estado vacío válido, no un error', () => {
+  const def = parse('');
+  assert.deepEqual(def, { resources: [], tasks: [], errors: [] });
+  const withRes = parse(`RECURSO ''R1''`);
+  assert.deepEqual(withRes.errors, []);
+  assert.deepEqual(withRes.resources, ['R1']);
+  const res = simulate(withRes, { algorithm: 'RR', quantum: 2 });
+  assert.equal(res.totalTime, 0);
+  assert.deepEqual(res.procs, []);
+  assert.deepEqual(res.metrics, { tpr: 0, tpe: 0 });
 });
 
 test('serialize: código → tabla → código es idempotente (round trip)', () => {

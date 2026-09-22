@@ -251,8 +251,8 @@
       totalTime: t,
       events: events,
       metrics: {
-        tpr: out.reduce(function (s, p) { return s + p.tr; }, 0) / n,
-        tpe: out.reduce(function (s, p) { return s + p.te; }, 0) / n,
+        tpr: n ? out.reduce(function (s, p) { return s + p.tr; }, 0) / n : 0,
+        tpe: n ? out.reduce(function (s, p) { return s + p.te; }, 0) / n : 0,
       },
     };
   }

@@ -83,7 +83,6 @@
       }
     });
 
-    if (!tasks.length && !errors.length) errors.push('No hay ninguna TAREA definida');
     tasks.forEach(function (t) {
       if (!t.bursts.length) errors.push('La tarea "' + t.name + '" no tiene ráfagas');
     });

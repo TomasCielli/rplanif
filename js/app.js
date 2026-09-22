@@ -188,6 +188,7 @@
 
   function render() {
     if (!state.def || !state.auto) return;
+    if (!state.def.tasks.length) { renderEmpty(); return; }
     $('status').textContent = describeConfig(state.cfg) + (state.mode === 'manual'
       ? ' — dibujá el diagrama y apretá "Corregir".'
       : ' — solución calculada por el simulador (' + state.auto.totalTime + ' instantes).');
@@ -199,6 +200,17 @@
     renderMetrics();
     renderFeedback();
     renderLog();
+  }
+
+  // Sin procesos: no hay nada que dibujar ni corregir.
+  function renderEmpty() {
+    $('status').textContent = describeConfig(state.cfg) + ' — sin procesos.';
+    $('gantt').innerHTML = '<div class="empty">No hay procesos. Agregá uno en la tabla, escribí el código o importá un archivo.</div>';
+    $('legend').innerHTML = '';
+    $('feedback').classList.add('hidden');
+    $('metrics').innerHTML = '<p class="hint">Sin procesos.</p>';
+    $('log').textContent = '';
+    renderBrushes();
   }
 
   function manualCell(pid, t) { return state.manual[pid + ':' + t] || { s: 'none' }; }
@@ -624,7 +636,7 @@
     var savedOrder = localStorage.getItem('rplanif.preemptedOrder');
     if (savedOrder && QP.PREEMPTED_ORDERS[savedOrder]) $('preempted-order').value = savedOrder;
   } catch (e) { /* sin storage */ }
-  $('definition').value = saved || DEFAULT_DEFINITION;
+  $('definition').value = saved !== null ? saved : DEFAULT_DEFINITION;
   $('theme-toggle').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️ Claro' : '🌙 Oscuro';
   syncAlgorithmUI();
   load('code');
