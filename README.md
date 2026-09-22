@@ -55,10 +55,11 @@ Abrí `index.html` en cualquier navegador. No hay que instalar nada.
    el que la está usando ni los que están en E/S) — es lo que hace falta para resolver
    los empates. En Manual la completás vos y "Corregir" la revisa.
 
-7. **Calculadora**: arriba a la derecha, junto a **Imagen**. Arranca cerrada; se abre con
-   el botón, se puede arrastrar desde su título para dejarla flotando en cualquier lado
-   (⤓ la vuelve a acoplar) y sirve para las cuentas de T<sub>R</sub>, T<sub>E</sub> y
-   promedios.
+7. **Calculadora**: a la derecha de la cola de listos, para las cuentas de T<sub>R</sub>,
+   T<sub>E</sub> y los promedios. Los botones **→ TPR** y **→ TPE** mandan el resultado
+   directamente al campo de promedio de la tabla de tiempos. Se puede minimizar con – y
+   arrastrar desde su título para dejarla flotando en cualquier lado (⤓ la vuelve a su
+   lugar).
 
 8. **Bloques plegables**: Procesos, Algoritmo, Diagrama, Tiempos y el log se pliegan desde
    su título; el estado se recuerda. El desplegable **⏱ Instantes** ajusta el ancho del

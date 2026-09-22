@@ -104,27 +104,6 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
             <button id="mode-auto" role="tab">⚙️ Automático</button>
           </div>
           <span class="spacer"></span>
-          <div class="calc" id="calc">
-            <div class="calc-head" id="calc-head" title="Arrastrá para mover la calculadora">
-              <span class="calc-title">Calculadora</span>
-              <span class="calc-actions">
-                <button id="calc-dock" class="mini hidden" title="Volver a acoplar junto a la tabla">⤓</button>
-                <button id="calc-min" class="mini" title="Minimizar / restaurar">–</button>
-              </span>
-            </div>
-            <div class="calc-body">
-            <input type="text" id="calc-expr" data-cap="calc" maxlength="80" inputmode="text" placeholder="(9+13+15+21)/4" autocomplete="off" spellcheck="false">
-            <div id="calc-result" class="calc-result">&nbsp;</div>
-            <div class="calc-keys" id="calc-keys">
-              <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="÷" class="op">÷</button>
-              <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="×" class="op">×</button>
-              <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k="−" class="op">−</button>
-              <button data-k="0">0</button><button data-k=",">,</button><button data-k="(" class="op">(</button><button data-k="+" class="op">+</button>
-              <button data-k=")" class="op">)</button><button data-a="clear" class="op" title="Borrar todo">C</button><button data-a="back" class="op" title="Borrar el último carácter">⌫</button><button data-a="eq" class="eq" title="Calcular (Enter)">=</button>
-            </div>
-            <ul id="calc-history" class="calc-history" title="Clic en un resultado para reutilizarlo"></ul>
-            </div>
-          </div>
           <button id="btn-image" title="Descargar el diagrama que se ve como imagen PNG">🖼️ Imagen</button>
         </div>
         <!-- fila 2: pinceles (sólo manual) -->
@@ -167,10 +146,37 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
             <summary>Tiempos</summary>
             <div id="metrics"></div>
           </details>
-          <details class="box" id="sec-ready" open>
-            <summary>Cola de listos</summary>
-            <div id="ready" class="readyq"></div>
-          </details>
+          <div class="side-tools">
+            <details class="box" id="sec-ready" open>
+              <summary>Cola de listos</summary>
+              <div id="ready" class="readyq"></div>
+            </details>
+            <div class="calc" id="calc">
+              <div class="calc-head" id="calc-head" title="Arrastrá para mover la calculadora">
+                <span class="calc-title">Calculadora</span>
+                <span class="calc-actions">
+                  <button id="calc-dock" class="mini hidden" title="Volver a acoplar junto a la tabla">⤓</button>
+                  <button id="calc-min" class="mini" title="Minimizar / restaurar">–</button>
+                </span>
+              </div>
+              <div class="calc-body">
+              <input type="text" id="calc-expr" data-cap="calc" maxlength="80" inputmode="text" placeholder="(9+13+15+21)/4" autocomplete="off" spellcheck="false">
+              <div id="calc-result" class="calc-result">&nbsp;</div>
+              <div class="calc-keys" id="calc-keys">
+                <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="÷" class="op">÷</button>
+                <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="×" class="op">×</button>
+                <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k="−" class="op">−</button>
+                <button data-k="0">0</button><button data-k=",">,</button><button data-k="(" class="op">(</button><button data-k="+" class="op">+</button>
+                <button data-k=")" class="op">)</button><button data-a="clear" class="op" title="Borrar todo">C</button><button data-a="back" class="op" title="Borrar el último carácter">⌫</button><button data-a="eq" class="eq" title="Calcular (Enter)">=</button>
+              </div>
+              <div class="calc-send">
+                <button data-send="tr" title="Poner el resultado en el promedio T_R (TPR)">→ TPR</button>
+                <button data-send="te" title="Poner el resultado en el promedio T_E (TPE)">→ TPE</button>
+              </div>
+              <ul id="calc-history" class="calc-history" title="Clic en un resultado para reutilizarlo"></ul>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

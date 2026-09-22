@@ -238,21 +238,18 @@ details.popover > summary:hover { border-color: var(--muted); background: var(--
 .metrics-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
 .metrics-row > :first-child { flex: 0 1 auto; min-width: 0; }
 .metrics-row .hint { max-width: 380px; margin-top: 6px; }
-.calc { position: relative; }
-.calc-head { display: flex; align-items: center; gap: 8px; cursor: move; user-select: none; touch-action: none;
-  border: 1px solid var(--border); background: var(--panel); border-radius: 6px; padding: 5px 10px; }
-.calc-head:hover { border-color: var(--muted); background: var(--panel-2); }
-.calc-title { font-size: 13px; color: var(--muted); }
-.calc-actions { display: flex; gap: 2px; }
-.calc-body { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; width: 232px;
-  background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.calc { width: 232px; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--panel-2); flex: 0 0 auto; }
+.calc.collapsed { width: auto; min-width: 150px; }
 .calc.collapsed .calc-body { display: none; }
-/* flotante: se despega de la barra y arrastra el panel entero */
-.calc.floating { position: fixed; z-index: 50; width: 232px; border: 1px solid var(--border); border-radius: 8px;
-  padding: 10px; background: var(--panel); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
-.calc.floating .calc-head { border: 0; background: transparent; padding: 0; margin-bottom: 6px; }
-.calc.floating .calc-body { position: static; width: auto; border: 0; padding: 0; box-shadow: none; }
+.calc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: move; user-select: none; touch-action: none; margin-bottom: 6px; }
+.calc.collapsed .calc-head { margin-bottom: 0; }
+.calc-title { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.calc-actions { display: flex; gap: 2px; }
+/* flotante: se despega de la fila y se arrastra por la pantalla */
+.calc.floating { position: fixed; z-index: 50; background: var(--panel); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
 .calc.dragging { opacity: .92; }
+.calc-send { display: flex; gap: 4px; margin-top: 6px; }
+.calc-send button { flex: 1; padding: 4px 0; font-size: 12px; }
 .calc input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-family: Consolas, "Courier New", monospace; font-size: 14px; text-align: right; }
 .calc-result { font-size: 20px; font-weight: 600; text-align: right; min-height: 28px; margin: 4px 0 6px; font-variant-numeric: tabular-nums; }
 .calc-result.err { font-size: 12px; font-weight: 400; color: var(--muted); }
@@ -286,7 +283,8 @@ details.popover > summary:hover { border-color: var(--muted); background: var(--
   .metrics-row > :first-child { width: 100%; }
   .metrics-box th, .metrics-box td { padding: 4px 6px; font-size: 12px; }
   .metrics-box table input { width: 52px; }
-  .calc-body { right: auto; left: 0; }
+  .calc { width: 100%; }
+  .calc.collapsed { width: auto; }
   .proc-table input.num { width: 40px; }
   .proc-table input.bursts { min-width: 90px; }
   .feedback ul { max-height: 160px; }
@@ -307,7 +305,10 @@ table:hover .colhead .mv, .colhead .mv:focus-visible { opacity: 1; }
 
 /* ---------- Cola de listos ---------- */
 .readyq { max-height: 280px; overflow: auto; width: 250px; }
-.metrics-row > #sec-ready { flex: 0 0 auto; }
+/* la cola y la calculadora viajan juntas: si no entran al lado de la tabla, bajan
+   las dos, pero la calculadora nunca se separa de la cola */
+.side-tools { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.side-tools > * { flex: 0 0 auto; }
 .readyq-table { border-collapse: collapse; font-size: 13px; width: 100%; }
 .readyq-table th, .readyq-table td { border: 1px solid var(--border); padding: 3px 8px; }
 .readyq-table th { background: var(--panel-3); font-weight: 600; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; position: sticky; top: 0; }

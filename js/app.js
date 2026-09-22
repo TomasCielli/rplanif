@@ -1150,6 +1150,21 @@
       preview();
     }
 
+    // manda el resultado al promedio correspondiente de la tabla de tiempos
+    function sendTo(which) {
+      var v = QP.evaluate(expr.value);
+      if (v === null) { preview(); return; }
+      state.manualMetrics.avg = state.manualMetrics.avg || {};
+      state.manualMetrics.avg[which] = Math.round(v * 100) / 100;
+      if (state.diff) delete state.diff.metrics['avg:' + which];   // el valor cambió: ya no vale el veredicto
+      render();
+      persist();
+    }
+
+    document.querySelectorAll('.calc-send button').forEach(function (btn) {
+      btn.addEventListener('click', function () { sendTo(btn.dataset.send); });
+    });
+
     expr.addEventListener('input', function () { capInput(expr); preview(); });
     expr.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === '=') { e.preventDefault(); compute(); }
@@ -1183,8 +1198,13 @@
   /* ---------------- bloques plegables y calculadora movible ---------------- */
 
   (function layoutUI() {
-    var ui = { sections: {}, calc: { floating: false, x: 0, y: 0, collapsed: true } };
+    var ui = { sections: {}, calc: { floating: false, x: 0, y: 0, collapsed: false } };
     try { ui = Object.assign(ui, JSON.parse(localStorage.getItem('rplanif.ui') || '{}')); } catch (e) { /* sin storage */ }
+    if (ui.calcPlacement !== 'row') {          // se mudó junto a la cola de listos: ahí entra abierta
+      ui.calcPlacement = 'row';
+      ui.calc.collapsed = false;
+      ui.calc.floating = false;
+    }
     function saveUI() { try { localStorage.setItem('rplanif.ui', JSON.stringify(ui)); } catch (e) { /* sin storage */ } }
 
     // secciones: recordar abierto/cerrado
