@@ -197,6 +197,7 @@ textarea { width: 100%; font-family: Consolas, "Courier New", monospace; font-si
 .proc-table td { padding: 2px 2px; vertical-align: middle; }
 .proc-table input { width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; }
 .proc-table input.num { width: 46px; text-align: center; }
+.proc-table input.invalid, #resources-input.invalid { border-color: var(--bad); background: var(--bad-bg); }
 .proc-table input.bursts { font-family: Consolas, "Courier New", monospace; min-width: 120px; }
 .proc-table .del { padding: 2px 7px; color: var(--bad); border-color: transparent; font-size: 14px; line-height: 1; }
 .proc-table .del:hover { border-color: var(--bad); background: var(--bad-bg); }

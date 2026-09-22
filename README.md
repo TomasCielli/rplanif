@@ -49,6 +49,12 @@ Abrí `index.html` en cualquier navegador. No hay que instalar nada.
   ejercicio a medio hacer o pasárselo a alguien.
 - **Importar** acepta ese `.json`, o un `.txt` con código qplanif pelado (por ejemplo los
   archivos de la cátedra). En `ejemplos/` están los del apunte listos para importar.
+- **🖼️ Imagen** descarga el diagrama que estás viendo (manual o automático) como PNG a
+  doble resolución, con el tema activo, para pegarlo en un informe. Se dibuja en un
+  `<canvas>` propio: no depende de ninguna librería ni de internet.
+
+Los nombres de procesos y recursos no pueden estar vacíos ni contener comillas, porque el
+formato los delimita con `''nombre''`. La tabla lo avisa mientras escribís.
 
 ## Reglas que aplica el simulador
 

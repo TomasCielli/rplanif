@@ -147,8 +147,13 @@
       inp.addEventListener('input', function () {
         var t = state.table.tasks[+inp.dataset.i];
         var f = inp.dataset.f;
+        if (f === 'name') {
+          var bad = QP.validateName(inp.value);
+          inp.classList.toggle('invalid', !!bad);
+          if (bad) { showErrors([bad + ' (proceso ' + (+inp.dataset.i + 1) + ')']); return; }
+        }
         if (f === 'arrival' || f === 'priority') t[f] = parseInt(inp.value, 10) || 0;
-        else t[f] = inp.value;
+        else t[f] = inp.value.trim();
         tableToCode();
       });
     });
@@ -550,13 +555,171 @@
 
   function exportFile() {
     var snap = snapshot();
-    var stamp = snap.savedAt.slice(0, 16).replace(/[-:T]/g, '').replace(/^(\d{8})(\d{4})$/, '$1-$2');
-    var blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
+    var stamp = timestamp();
+    downloadBlob(new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' }), 'rplanif-' + stamp + '.json');
+  }
+
+  function downloadBlob(blob, filename) {
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'rplanif-' + stamp + '.json';
+    a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  function timestamp() {
+    return new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '').replace(/^(\d{8})(\d{4})$/, '$1-$2');
+  }
+
+  /* ---------------- exportar imagen ---------------- */
+
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  // Modelo de filas del Gantt visible (mismo contenido que renderGantt, sin DOM).
+  function ganttRows() {
+    var manual = state.mode === 'manual';
+    var T = manual ? state.horizon : state.auto.totalTime + 1;
+    var rows = [];
+    if (!manual) rows.push({ label: 'CPU', sub: '', summary: state.auto.cpuTimeline });
+    state.def.tasks.forEach(function (task, i) {
+      var pid = i + 1, cells = [], marks = [];
+      for (var t = 0; t < T; t++) {
+        cells.push(manual ? manualCell(pid, t) : autoCell(pid, t));
+        marks.push(manual ? manualMarkers(pid, t) : autoMarkers(pid, t));
+      }
+      rows.push({
+        label: task.name,
+        sub: 'llega ' + task.arrival + (state.cfg.algorithm === 'PRIORITY' ? ' · prio ' + task.priority : ''),
+        cells: cells, marks: marks,
+      });
+    });
+    if (!manual) state.auto.resources.forEach(function (r) { rows.push({ label: r.name, sub: 'recurso', summary: r.timeline }); });
+    return { T: T, rows: rows, manual: manual };
+  }
+
+  function exportImage() {
+    if (!state.def || !state.auto || !state.def.tasks.length) return;
+    var m = ganttRows();
+    var S = 2, pad = 20, labelW = 150, cellW = 30, rowH = 36, headH = 28, titleH = 28, legendH = 30;
+    var W = pad * 2 + labelW + m.T * cellW;
+    var H = pad * 2 + titleH + headH + m.rows.length * rowH + legendH;
+    var cv = document.createElement('canvas');
+    cv.width = W * S; cv.height = H * S;
+    var ctx = cv.getContext('2d');
+    ctx.scale(S, S);
+    var C = {
+      bg: cssVar('--panel'), text: cssVar('--text'), muted: cssVar('--muted'), border: cssVar('--border'),
+      soft: cssVar('--border-soft'), tick: cssVar('--border-tick'), cpu: cssVar('--cpu'), io: cssVar('--io'),
+      wait: cssVar('--wait'), wait2: cssVar('--wait-2'), ready: cssVar('--ready'), dot: cssVar('--ready-dot'),
+      panel2: cssVar('--panel-2'), panel3: cssVar('--panel-3'), idle: cssVar('--idle'),
+    };
+    var FONT = '"Segoe UI", system-ui, -apple-system, sans-serif';
+    var x0 = pad + labelW, y0 = pad + titleH;
+
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+    ctx.textBaseline = 'middle';
+
+    // título
+    ctx.fillStyle = C.text; ctx.font = 'bold 14px ' + FONT; ctx.textAlign = 'left';
+    ctx.fillText('rplanif — ' + describeConfig(state.cfg) + (m.manual ? '  ·  diagrama manual' : '  ·  solución del simulador'), pad, pad + titleH / 2 - 4);
+
+    // cabecera de tiempos
+    ctx.textAlign = 'center'; ctx.font = '11px ' + FONT;
+    for (var t = 0; t < m.T; t++) {
+      ctx.fillStyle = t % 5 === 0 ? C.text : C.muted;
+      ctx.font = (t % 5 === 0 ? 'bold ' : '') + '11px ' + FONT;
+      ctx.fillText(String(t), x0 + t * cellW + cellW / 2, y0 + headH / 2);
+    }
+    hline(y0 + headH);
+
+    m.rows.forEach(function (row, ri) {
+      var y = y0 + headH + ri * rowH;
+      // etiqueta
+      ctx.fillStyle = row.summary ? C.panel3 : C.panel2;
+      ctx.fillRect(pad, y, labelW, rowH);
+      ctx.textAlign = 'left'; ctx.fillStyle = C.text; ctx.font = 'bold 13px ' + FONT;
+      ctx.fillText(row.label, pad + 10, y + rowH / 2);
+      if (row.sub) {
+        var lw = ctx.measureText(row.label).width;
+        ctx.font = '11px ' + FONT; ctx.fillStyle = C.muted;
+        ctx.fillText(row.sub, pad + 10 + lw + 6, y + rowH / 2);
+      }
+      for (var t = 0; t < m.T; t++) {
+        var x = x0 + t * cellW;
+        if (row.summary) {
+          ctx.fillStyle = C.panel2; ctx.fillRect(x, y, cellW, rowH);
+          var pid = row.summary[t];
+          ctx.textAlign = 'center';
+          ctx.fillStyle = pid == null ? C.idle : C.text;
+          ctx.font = (pid == null ? '' : 'bold ') + '11px ' + FONT;
+          ctx.fillText(pid == null ? '·' : state.auto.procs[pid - 1].name, x + cellW / 2, y + rowH / 2);
+        } else {
+          var c = row.cells[t], by = y + 8, bh = rowH - 16;
+          if (c.s === 'cpu' || c.s === 'io') {
+            ctx.fillStyle = c.s === 'cpu' ? C.cpu : resourceColor(c.r);
+            ctx.fillRect(x, by, cellW, bh);
+            if (c.s === 'io') { ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = '10px ' + FONT; ctx.fillText(c.r, x + cellW / 2, by + bh / 2); }
+          } else if (c.s === 'wait') {
+            ctx.save(); ctx.beginPath(); ctx.rect(x, by, cellW, bh); ctx.clip();
+            ctx.fillStyle = C.wait2; ctx.fillRect(x, by, cellW, bh);
+            ctx.strokeStyle = C.wait; ctx.lineWidth = 3;
+            for (var k = -bh; k < cellW + bh; k += 8) { ctx.beginPath(); ctx.moveTo(x + k, by + bh); ctx.lineTo(x + k + bh, by); ctx.stroke(); }
+            ctx.restore();
+            ctx.fillStyle = C.text; ctx.textAlign = 'center'; ctx.font = '10px ' + FONT; ctx.fillText('⏳' + c.r, x + cellW / 2, by + bh / 2);
+          } else if (c.s === 'ready') {
+            ctx.fillStyle = C.ready; ctx.fillRect(x, by, cellW, bh);
+            ctx.fillStyle = C.dot; ctx.beginPath(); ctx.arc(x + cellW / 2, by + bh / 2, 2.5, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+        // separador vertical
+        ctx.beginPath();
+        ctx.setLineDash(t % 5 === 4 ? [] : [1, 2]);
+        ctx.strokeStyle = t % 5 === 4 ? C.tick : C.soft; ctx.lineWidth = 1;
+        ctx.moveTo(x + cellW + 0.5, y); ctx.lineTo(x + cellW + 0.5, y + rowH); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      // marcadores (encima de las barras y separadores)
+      if (!row.summary) {
+        for (var t2 = 0; t2 < m.T; t2++) {
+          var mk = row.marks[t2], mx = x0 + t2 * cellW;
+          ctx.fillStyle = C.io;
+          if (mk.up) { ctx.beginPath(); ctx.moveTo(mx - 6, y + rowH); ctx.lineTo(mx + 6, y + rowH); ctx.lineTo(mx, y + rowH - 8); ctx.closePath(); ctx.fill(); }
+          if (mk.down) { ctx.beginPath(); ctx.moveTo(mx - 6, y); ctx.lineTo(mx + 6, y); ctx.lineTo(mx, y + 8); ctx.closePath(); ctx.fill(); }
+        }
+      }
+      hline(y + rowH);
+    });
+    // borde izquierdo de la grilla
+    ctx.strokeStyle = C.border; ctx.beginPath(); ctx.moveTo(x0 + 0.5, y0); ctx.lineTo(x0 + 0.5, y0 + headH + m.rows.length * rowH); ctx.stroke();
+
+    // leyenda
+    var ly = y0 + headH + m.rows.length * rowH + legendH / 2 + 6, lx = pad;
+    var items = [[C.cpu, 'Uso de CPU']];
+    state.def.resources.forEach(function (r) { items.push([resourceColor(r), 'E/S ' + r]); });
+    if (!m.manual) items.push([C.wait, 'Bloqueado esperando el recurso'], [C.ready, 'Listo (esperando CPU)']);
+    items.push(['▲', 'Llegada al sistema'], ['▼', 'Fin del proceso']);
+    ctx.font = '11px ' + FONT; ctx.textAlign = 'left';
+    items.forEach(function (it) {
+      if (it[0] === '▲' || it[0] === '▼') {
+        ctx.fillStyle = C.io; ctx.beginPath();
+        if (it[0] === '▲') { ctx.moveTo(lx, ly + 5); ctx.lineTo(lx + 12, ly + 5); ctx.lineTo(lx + 6, ly - 4); }
+        else { ctx.moveTo(lx, ly - 4); ctx.lineTo(lx + 12, ly - 4); ctx.lineTo(lx + 6, ly + 5); }
+        ctx.closePath(); ctx.fill();
+      } else {
+        ctx.fillStyle = it[0]; ctx.fillRect(lx, ly - 5, 14, 10);
+        ctx.strokeStyle = C.border; ctx.strokeRect(lx + 0.5, ly - 4.5, 13, 9);
+      }
+      ctx.fillStyle = C.muted;
+      ctx.fillText(it[1], lx + 19, ly);
+      lx += 19 + ctx.measureText(it[1]).width + 16;
+    });
+
+    cv.toBlob(function (blob) { downloadBlob(blob, 'rplanif-gantt-' + timestamp() + '.png'); }, 'image/png');
+
+    function hline(yy) {
+      ctx.strokeStyle = C.border; ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(pad, yy + 0.5); ctx.lineTo(W - pad, yy + 0.5); ctx.stroke();
+    }
   }
 
   function applySnapshot(snap) {
@@ -633,9 +796,15 @@
   $('btn-load').addEventListener('click', function () { load('code'); });
   $('definition').addEventListener('keydown', function (e) { if (e.ctrlKey && e.key === 'Enter') load('code'); });
   $('resources-input').addEventListener('change', function () {
-    state.table.resources = $('resources-input').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    var names = $('resources-input').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    var bad = null;
+    names.forEach(function (n) { bad = bad || QP.validateName(n); });
+    $('resources-input').classList.toggle('invalid', !!bad);
+    if (bad) { showErrors([bad + ' (recursos)']); return; }
+    state.table.resources = names;
     tableToCode();
   });
+  $('btn-image').addEventListener('click', exportImage);
   $('btn-add-task').addEventListener('click', addTask);
   $('mode-manual').addEventListener('click', function () { setMode('manual'); });
   $('mode-auto').addEventListener('click', function () { setMode('auto'); });

@@ -2,7 +2,7 @@
 // Ejecutar con:  node --test tests/
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parse, serialize, burstsToString } = require('../js/parser.js');
+const { parse, serialize, burstsToString, validateName } = require('../js/parser.js');
 const { simulate } = require('../js/scheduler.js');
 
 const EJEMPLO_1 = `
@@ -81,6 +81,17 @@ test('parser: errores claros', () => {
   const def = parse(`TAREA ''X'' INICIO=0 [7,3]`);
   assert.ok(def.errors.some((e) => /recurso "7" no definido/.test(e)));
   assert.ok(parse('[CPU,3]').errors.some((e) => /fuera de una TAREA/.test(e)));
+});
+
+test('parser: nombres vacíos o con comillas dan un error explicativo', () => {
+  assert.ok(parse(`TAREA '''' INICIO=0 [CPU,1]`).errors.some((e) => /nombre.*vac/i.test(e)));
+  assert.ok(parse(`RECURSO ''''`).errors.some((e) => /nombre.*vac/i.test(e)));
+  const withQuote = parse(`TAREA ''A'B'' INICIO=0 [CPU,1]`);
+  assert.ok(withQuote.errors.some((e) => /comillas/.test(e)), withQuote.errors.join(' | '));
+  assert.equal(validateName('A'), null);
+  assert.equal(validateName(' '), 'El nombre no puede estar vacío');
+  assert.match(validateName("A'B"), /comillas/);
+  assert.match(validateName('A"B'), /comillas/);
 });
 
 test('una definición sin procesos es un estado vacío válido, no un error', () => {

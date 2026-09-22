@@ -30,6 +30,14 @@
     'gi'
   );
 
+  // Regla de los nombres (tareas y recursos): no vacíos y sin comillas, porque el formato
+  // los delimita con ''nombre''. Devuelve el mensaje de error o null si es válido.
+  function validateName(name) {
+    if (!String(name || '').trim()) return 'El nombre no puede estar vacío';
+    if (/['"]/.test(name)) return "El nombre no puede contener comillas: el formato lo escribe como ''nombre''";
+    return null;
+  }
+
   function parse(text) {
     var resources = [];
     var tasks = [];
@@ -46,6 +54,8 @@
       while ((m = TOKEN.exec(line))) {
         if (m[1]) {
           var name = [m[2], m[3], m[4], m[5]].find(function (v) { return v !== undefined; });
+          var bad = validateName(name);
+          if (bad) errors.push('Línea ' + lineNo + ': ' + bad.charAt(0).toLowerCase() + bad.slice(1) + ' (' + m[1].toUpperCase() + ')');
           if (m[1].toUpperCase() === 'RECURSO') {
             if (resources.indexOf(name) >= 0) errors.push('Línea ' + lineNo + ': recurso "' + name + '" repetido');
             else resources.push(name);
@@ -78,7 +88,9 @@
             current.bursts.push({ type: 'io', resource: rname, dur: dur });
           }
         } else if (m[10]) {
-          errors.push('Línea ' + lineNo + ': no entiendo "' + m[10] + '"');
+          errors.push(/['"]/.test(m[10])
+            ? 'Línea ' + lineNo + ': no entiendo "' + m[10] + "\" — los nombres van entre comillas simples dobles (''nombre'') y no pueden contener comillas"
+            : 'Línea ' + lineNo + ': no entiendo "' + m[10] + '"');
         }
       }
     });
@@ -107,7 +119,7 @@
     return lines.join('\n') + '\n';
   }
 
-  var api = { parse: parse, serialize: serialize, burstsToString: burstsToString };
+  var api = { parse: parse, serialize: serialize, burstsToString: burstsToString, validateName: validateName };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.RPlanif = Object.assign(root.RPlanif || {}, api);
 })(typeof window !== 'undefined' ? window : globalThis);
