@@ -289,10 +289,19 @@
     };
   }
 
-  // La tabla genera el código y lo carga.
+  // La tabla genera el código y lo carga. Si alguna fila no se puede convertir en
+  // ráfagas no se toca la definición: antes se escribía una tarea sin ráfagas y el
+  // error que aparecía ("no tiene ráfagas") no decía nada del problema real.
   function tableToCode() {
+    var bad = null;
+    state.table.tasks.forEach(function (t, i) {
+      var chk = QP.specToBursts(t.cpu, t.io, state.table.resources);
+      markSpec(i, !chk.errors.length);
+      if (!bad && chk.errors.length) bad = chk.errors[0] + ' (proceso ' + t.name + ')';
+    });
+    if (bad) { showErrors([bad]); return false; }
     $('definition').value = QP.serialize(state.table);
-    load('table');
+    return load('table');
   }
 
   // Atributos comunes de un campo acotado (tipo de dato, tope y largo máximo).
@@ -334,12 +343,6 @@
         }
         if (f === 'arrival' || f === 'priority' || f === 'cpu') t[f] = parseInt(inp.value, 10) || 0;
         else t[f] = inp.value.trim();
-        if (f === 'cpu' || f === 'io') {
-          // CPU y E/S se validan juntas: una E/S no puede caer más allá del total de CPU
-          var chk = QP.specToBursts(t.cpu, t.io, state.table.resources);
-          markSpec(i, !chk.errors.length);
-          if (chk.errors.length) { showErrors([chk.errors[0] + ' (proceso ' + t.name + ')']); return; }
-        }
         tableToCode();
       });
     });
@@ -379,6 +382,22 @@
     ['cpu', 'io'].forEach(function (f) {
       var el = document.querySelector('#proc-table input[data-f="' + f + '"][data-i="' + i + '"]');
       if (el) el.classList.toggle('invalid', !ok);
+    });
+  }
+
+  // Si el cambio en la lista de recursos fue renombrar uno solo, las E/S que lo nombran
+  // se actualizan solas (si no, quedarían apuntando a un recurso que ya no existe).
+  function renameResource(before, after) {
+    if (before.length !== after.length) return;
+    var changed = [];
+    before.forEach(function (n, i) { if (n !== after[i]) changed.push(i); });
+    if (changed.length !== 1) return;                       // agregar, quitar o reordenar: no se toca
+    var from = before[changed[0]], to = after[changed[0]];
+    if (before.indexOf(to) >= 0) return;                    // el nombre nuevo ya existía: es un reordenamiento
+    state.table.tasks.forEach(function (t) {
+      t.io = String(t.io || '').replace(/\(\s*([^,()\s]+)\s*,/g, function (m, res) {
+        return res === from ? '(' + to + ',' : m;
+      });
     });
   }
 
@@ -449,9 +468,24 @@
     renderHorizon();
   }
 
+  // El diagrama no puede achicarse por debajo de lo que ya tiene contenido. Antes lo que
+  // quedaba fuera seguía guardado: la cola de listos se corregía sin poder verse y los
+  // marcadores directamente dejaban de corregirse.
+  function minHorizon() {
+    var last = 4;                                   // piso de 5 columnas
+    function see(key) { var t = +String(key).split(':').pop(); if (t > last) last = t; }
+    Object.keys(state.manual).forEach(see);
+    Object.keys(state.markers).forEach(see);
+    Object.keys(state.ready).forEach(see);
+    return Math.min(MAX_T, last + 1);
+  }
+
   function renderHorizon() {
     $('horizon-count').textContent = state.horizon;
     $('horizon-value').textContent = state.horizon;
+    var min = minHorizon();
+    $('horizon-note').textContent = min > 5 ? 'Mínimo ' + min + ': hay contenido dibujado hasta t=' + (min - 1) + '.' : '';
+    $('horizon-note').classList.toggle('hidden', min <= 5);
   }
 
   // Instante del marcador (▲ 'up' / ▼ 'down') de un proceso, o null si no está puesto.
@@ -954,6 +988,9 @@
     var S = 2, pad = 20, labelW = 150, cellW = 30, rowH = 36, headH = 28, titleH = 28, legendH = 30;
     var W = pad * 2 + labelW + m.T * cellW;
     var H = pad * 2 + titleH + headH + m.rows.length * rowH + legendH;
+    // Safari corta los canvas en 16,7 millones de píxeles: con diagramas muy largos se
+    // baja la resolución antes de que devuelva una imagen en blanco sin avisar.
+    while (S > 1 && W * S * H * S > 16000000) S -= 0.5;
     var cv = document.createElement('canvas');
     cv.width = W * S; cv.height = H * S;
     var ctx = cv.getContext('2d');
@@ -1089,7 +1126,7 @@
     state.markers = m.markers || {};
     state.manualMetrics = m.metrics || {};
     state.ready = m.ready || {};
-    state.horizon = Math.min(MAX_T, Math.max(m.horizon || 0, state.auto.totalTime + 4, 16));
+    state.horizon = Math.min(MAX_T, Math.max(m.horizon || 0, minHorizon(), state.auto.totalTime + 4, 16));
     state.diff = null;
     render();
     return true;
@@ -1175,7 +1212,9 @@
     names.forEach(function (n) { bad = bad || QP.validateName(n); });
     $('resources-input').classList.toggle('invalid', !!bad);
     if (bad) { showErrors([bad + ' (recursos)']); return; }
+    renameResource(state.table.resources, names);
     state.table.resources = names;
+    renderTable();
     tableToCode();
   });
   $('btn-image').addEventListener('click', exportImage);
@@ -1190,7 +1229,7 @@
   $('horizon-stepper').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-d]');
     if (!b) return;
-    state.horizon = Math.min(MAX_T, Math.max(5, state.horizon + parseInt(b.dataset.d, 10)));
+    state.horizon = Math.min(MAX_T, Math.max(minHorizon(), state.horizon + parseInt(b.dataset.d, 10)));
     render();
   });
   // el desplegable se cierra al hacer clic afuera
