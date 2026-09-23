@@ -304,7 +304,7 @@ table:hover .colhead .mv, .colhead .mv:focus-visible { opacity: 1; }
 @media (max-width: 900px) { .colhead .mv { opacity: 1; } }
 
 /* ---------- Cola de listos ---------- */
-.readyq { max-height: 280px; overflow: auto; width: 250px; }
+.readyq { max-height: 280px; overflow: auto; width: auto; max-width: 460px; }
 /* la cola y la calculadora viajan juntas: si no entran al lado de la tabla, bajan
    las dos, pero la calculadora nunca se separa de la cola */
 .side-tools { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
@@ -314,7 +314,7 @@ table:hover .colhead .mv, .colhead .mv:focus-visible { opacity: 1; }
 .readyq-table th { background: var(--panel-3); font-weight: 600; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; position: sticky; top: 0; }
 .readyq-table td.t { text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; width: 34px; }
 .readyq-table td:last-child { font-variant-numeric: tabular-nums; }
-.readyq-table input { width: 100%; min-width: 88px; padding: 2px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; }
+.readyq-table input { width: 100%; min-width: 72px; padding: 2px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; }
 .readyq-table input:focus { border-color: var(--border); background: var(--panel); }
 .metrics-box .readyq-table input.wrong { border-color: var(--bad); background: var(--bad-bg); }
 .metrics-box .readyq-table input.right { border-color: var(--ok); background: var(--ok-bg); }
@@ -326,3 +326,15 @@ table:hover .colhead .mv, .colhead .mv:focus-visible { opacity: 1; }
 .res-row select { flex: 1; min-width: 0; padding: 3px 6px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; }
 .res-row .q { width: 46px; text-align: center; padding: 3px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; }
 .res-row .tiny { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* ---------- Paso a paso ---------- */
+.step-events { font-size: 12px; color: var(--muted); flex: 1; min-width: 0; }
+.step-events b { color: var(--text); font-weight: 600; }
+#step-label { min-width: 54px; text-align: center; font-variant-numeric: tabular-nums; }
+.gantt .head.now { color: var(--accent); font-weight: 700; }
+.gantt .cell.now { box-shadow: inset 2px 0 0 var(--accent), inset -2px 0 0 var(--accent); }
+.gantt .cell.summary.now { background: var(--panel-3); }
+.readyq-table tr.now td { background: var(--panel-3); }
+.readyq-table tr.now td.t { color: var(--accent); font-weight: 700; }
+button:disabled { opacity: .4; cursor: default; }
+button:disabled:hover { border-color: var(--border); background: var(--panel); }

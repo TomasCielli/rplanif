@@ -118,6 +118,10 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
             <button id="btn-check" class="primary">Corregir</button>
             <button id="btn-clear">Limpiar</button>
           </div>
+          <div class="group">
+            <button id="btn-undo" title="Deshacer (Ctrl+Z)">↶</button>
+            <button id="btn-redo" title="Rehacer (Ctrl+Y)">↷</button>
+          </div>
           <span class="spacer"></span>
           <details class="popover" id="horizon-box">
             <summary title="Cantidad de instantes del diagrama manual">⏱ Instantes: <b id="horizon-count">20</b></summary>
@@ -131,6 +135,18 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
               <p id="horizon-note" class="hint hidden"></p>
             </div>
           </details>
+        </div>
+        <!-- fila 3 bis: recorrido instante por instante (sólo automático) -->
+        <div id="auto-tools" class="toolbar-row hidden">
+          <button id="step-toggle">⏯ Paso a paso</button>
+          <span id="step-controls" class="group hidden">
+            <button id="step-first" title="Volver al inicio">⏮</button>
+            <button id="step-prev" title="Instante anterior (←)">◀</button>
+            <b id="step-label">t = 0</b>
+            <button id="step-next" title="Instante siguiente (→)">▶</button>
+            <button id="step-last" title="Ir al final">⏭</button>
+          </span>
+          <span id="step-events" class="step-events"></span>
         </div>
       </div>
 

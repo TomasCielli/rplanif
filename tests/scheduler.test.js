@@ -313,6 +313,17 @@ test('cada recurso usa FIFO si no se indica otra cosa', () => {
   assert.equal(d[14], 3);
 });
 
+test('cada recurso registra su cola instante por instante', () => {
+  const res = run(DISPUTA_R1, { algorithm: 'FIFO' });
+  const cola = (t) => res.resources[0].queueTimeline[t].map((pid) => res.procs[pid - 1].name).join(',');
+  assert.equal(cola(1), '');      // P1 toma el recurso apenas lo pide
+  assert.equal(cola(3), '2');     // P2 lo pide y queda esperando
+  assert.equal(cola(7), '2,3');   // también P3
+  assert.equal(cola(9), '3');     // entra P2, queda P3
+  assert.equal(cola(16), '');
+  assert.equal(res.resources[0].queueTimeline.length, res.totalTime);
+});
+
 test('un recurso puede planificar su cola con SJF', () => {
   const d = dev(run(DISPUTA_R1, { algorithm: 'FIFO', resources: { R1: { algorithm: 'SJF' } } }), 'R1');
   assert.equal(d[9], 3);           // la E/S más corta primero

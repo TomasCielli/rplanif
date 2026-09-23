@@ -144,6 +144,7 @@
     manual: {}, markers: {}, manualMetrics: {}, ready: {},
     resPolicies: {},   // política de la cola de cada recurso de E/S
     mode: 'manual', brush: 'cpu', horizon: 20,
+    step: null,        // instante mostrado en el recorrido paso a paso (null = todo)
     diff: null, painting: false,
   };
 
@@ -362,6 +363,7 @@
 
   // La columna Fin escribe el marcador ▼ del proceso.
   function editFinish(pid, raw) {
+    beginTyping();
     raw = String(raw).trim();
     if (raw === '') setMarker(pid, 'down', null);
     else {
@@ -427,6 +429,8 @@
     $('mode-auto').classList.toggle('active', mode === 'auto');
     $('manual-tools').classList.toggle('hidden', mode !== 'manual');
     $('manual-actions').classList.toggle('hidden', mode !== 'manual');
+    $('auto-tools').classList.toggle('hidden', mode !== 'auto');
+    if (mode !== 'auto') state.step = null;
     $('log-box').classList.toggle('hidden', mode !== 'auto');
     render();
   }
@@ -450,6 +454,7 @@
     else renderGantt(autoCell, autoMarkers, false, state.auto.totalTime + 1);
     renderMetrics();
     renderReady();
+    renderStep();
     renderFeedback();
     renderLog();
     syncFinishInputs();
@@ -525,10 +530,16 @@
     });
   }
 
+  // En el recorrido paso a paso todavía no pasó nada después del instante actual.
+  function hidden(t) { return state.step != null && t > state.step; }
+
   function manualCell(pid, t) { return state.manual[pid + ':' + t] || { s: 'none' }; }
   function manualMarkers(pid, t) { return state.markers[pid + ':' + t] || {}; }
-  function autoCell(pid, t) { return state.auto.procs[pid - 1].timeline[t] || { s: 'none' }; }
+  function autoCell(pid, t) {
+    return hidden(t) ? { s: 'none' } : (state.auto.procs[pid - 1].timeline[t] || { s: 'none' });
+  }
   function autoMarkers(pid, t) {
+    if (hidden(t)) return {};
     var p = state.auto.procs[pid - 1];
     return { up: p.arrival === t, down: p.finish === t };
   }
@@ -589,7 +600,7 @@
     grid.appendChild(corner);
     for (var t = 0; t < T; t++) {
       var h = document.createElement('div');
-      h.className = 'head' + (t % 5 === 0 ? ' major' : '');
+      h.className = 'head' + (t % 5 === 0 ? ' major' : '') + (state.step === t ? ' now' : '');
       h.textContent = t;
       grid.appendChild(h);
     }
@@ -601,7 +612,7 @@
       var sub = 'llega ' + task.arrival + (state.cfg.algorithm === 'PRIORITY' ? ' · prio ' + task.priority : '');
       addRow(grid, task.name, sub, T, function (t) {
         var d = document.createElement('div');
-        d.className = 'cell' + (t % 5 === 4 ? ' tick' : '');
+        d.className = 'cell' + (t % 5 === 4 ? ' tick' : '') + (state.step === t ? ' now' : '');
         d.dataset.pid = pid; d.dataset.t = t;
         fillCell(d, getCell(pid, t), getMarkers(pid, t));
         var w = state.diff && state.diff.wrong[pid + ':' + t];
@@ -620,9 +631,9 @@
 
   function addSummaryRow(grid, label, sub, T, timeline) {
     addRow(grid, label, sub, T, function (t) {
-      var pid = timeline[t];
+      var pid = hidden(t) ? null : timeline[t];
       var d = document.createElement('div');
-      d.className = 'cell summary' + (pid == null ? ' idle' : '');
+      d.className = 'cell summary' + (pid == null ? ' idle' : '') + (state.step === t ? ' now' : '');
       d.textContent = pid == null ? '·' : state.auto.procs[pid - 1].name;
       return d;
     }, true);
@@ -678,6 +689,7 @@
     if (!cell) return;
     e.preventDefault();
     state.painting = true;
+    pushHistory();
     paint(cell, false);
   });
   $('gantt').addEventListener('pointerover', function (e) {
@@ -688,7 +700,7 @@
   $('gantt').addEventListener('click', function (e) {
     if (state.mode !== 'manual' || lastPointerType === 'mouse') return;
     var cell = e.target.closest('.cell');
-    if (cell) paint(cell, false);
+    if (cell) { pushHistory(); paint(cell, false); }
   });
   window.addEventListener('pointerup', function () { state.painting = false; });
   window.addEventListener('pointercancel', function () { state.painting = false; });
@@ -696,10 +708,65 @@
 
   /* ---------------- métricas ---------------- */
 
+  /* ---------------- deshacer / rehacer ---------------- */
+
+  // Guarda el trabajo manual completo. Los cambios de texto empujan una sola entrada por
+  // sesión de tecleo (no una por tecla), con history.typing.
+  var history = { past: [], future: [], typing: false };
+
+  function manualSnapshot() {
+    return JSON.stringify({ manual: state.manual, markers: state.markers, ready: state.ready,
+                            metrics: state.manualMetrics, horizon: state.horizon });
+  }
+
+  function pushHistory() {
+    history.past.push(manualSnapshot());
+    if (history.past.length > 40) history.past.shift();
+    history.future.length = 0;
+    renderUndo();
+  }
+
+  function beginTyping() { if (!history.typing) { history.typing = true; pushHistory(); } }
+
+  function applyHistory(payload) {
+    var d = JSON.parse(payload);
+    state.manual = d.manual; state.markers = d.markers; state.ready = d.ready;
+    state.manualMetrics = d.metrics; state.horizon = d.horizon;
+    state.diff = null;
+    render();
+    renderUndo();
+  }
+
+  function undo() {
+    if (!history.past.length) return;
+    history.future.push(manualSnapshot());
+    applyHistory(history.past.pop());
+  }
+
+  function redo() {
+    if (!history.future.length) return;
+    history.past.push(manualSnapshot());
+    applyHistory(history.future.pop());
+  }
+
+  function renderUndo() {
+    $('btn-undo').disabled = !history.past.length;
+    $('btn-redo').disabled = !history.future.length;
+  }
+
   /* ---------------- cola de listos ---------------- */
 
-  function queueNames(t) {
-    return (state.auto.readyTimeline[t] || []).map(function (pid) { return state.auto.procs[pid - 1].name; }).join(', ');
+  // Una entrada por cola: la de listos (CPU) y la de cada recurso.
+  function queueList() {
+    var list = [{ key: 'cpu', label: 'CPU', timeline: state.auto.readyTimeline }];
+    state.auto.resources.forEach(function (r) {
+      list.push({ key: r.name, label: r.name, timeline: r.queueTimeline || [] });
+    });
+    return list;
+  }
+
+  function queueNames(timeline, t) {
+    return ((timeline || [])[t] || []).map(function (pid) { return state.auto.procs[pid - 1].name; }).join(', ');
   }
 
   function normQueue(text) {
@@ -710,22 +777,30 @@
     var box = $('ready');
     var manual = state.mode === 'manual';
     var T = manual ? state.horizon : state.auto.totalTime;
+    var qs = queueList();
     var rows = '';
     for (var t = 0; t < T; t++) {
-      rows += '<tr><td class="t">' + t + '</td><td>' + (manual
-        ? '<input data-t="' + t + '" data-cap="queue" maxlength="60" value="' + escapeAttr(state.ready[t] || '') + '" placeholder="—" autocomplete="off" spellcheck="false">'
-        : (queueNames(t) || '·')) + '</td></tr>';
+      rows += '<tr' + (state.step === t ? ' class="now"' : '') + '><td class="t">' + t + '</td>'
+        + qs.map(function (q) {
+            return '<td>' + (manual
+              ? '<input data-q="' + escapeAttr(q.key) + '" data-t="' + t + '" data-cap="queue" maxlength="60" value="'
+                  + escapeAttr(state.ready[q.key + ':' + t] || '') + '" placeholder="—" autocomplete="off" spellcheck="false">'
+              : (queueNames(q.timeline, t) || '·')) + '</td>';
+          }).join('') + '</tr>';
     }
-    box.innerHTML = '<table class="readyq-table"><thead><tr><th>t</th><th>Esperan la CPU</th></tr></thead><tbody>'
-      + rows + '</tbody></table>'
-      + (manual ? '<p class="hint">Escribí los procesos en el orden en que los tomaría el planificador, separados por coma. "Corregir" también la revisa.</p>'
-                : '<p class="hint">Quiénes esperan la CPU en cada instante (sin el que la está usando ni los que están en E/S).</p>');
+    box.innerHTML = '<table class="readyq-table"><thead><tr><th>t</th>'
+      + qs.map(function (q) { return '<th title="' + escapeAttr(q.key === 'cpu' ? 'Cola de listos' : 'Cola del recurso ' + q.label) + '">' + escapeHtml(q.label) + '</th>'; }).join('')
+      + '</tr></thead><tbody>' + rows + '</tbody></table>'
+      + (manual ? '<p class="hint">Una columna por cola: la CPU y cada recurso. Escribí los procesos que esperan, en orden y separados por coma. "Corregir" también las revisa.</p>'
+                : '<p class="hint">Quiénes esperan en cada cola (sin el que está siendo atendido).</p>');
 
     box.querySelectorAll('input').forEach(function (inp) {
       inp.addEventListener('input', function () {
         capInput(inp);
-        if (inp.value.trim() === '') delete state.ready[inp.dataset.t];
-        else state.ready[inp.dataset.t] = inp.value;
+        beginTyping();
+        var key = inp.dataset.q + ':' + inp.dataset.t;
+        if (inp.value.trim() === '') delete state.ready[key];
+        else state.ready[key] = inp.value;
         inp.classList.remove('wrong', 'right');
         persist();
       });
@@ -735,7 +810,7 @@
 
   function markReadyInputs() {
     document.querySelectorAll('#ready input').forEach(function (inp) {
-      var r = state.diff.queue[inp.dataset.t];
+      var r = state.diff.queue[inp.dataset.q + ':' + inp.dataset.t];
       if (r === undefined) return;
       inp.classList.add(r ? 'right' : 'wrong');
     });
@@ -775,6 +850,7 @@
       inp.addEventListener('input', function () {
         capInput(inp);
         if (inp.dataset.m === 'finish') { editFinish(+inp.dataset.pid, inp.value); return; }
+        beginTyping();
         var pid = inp.dataset.pid;
         state.manualMetrics[pid] = state.manualMetrics[pid] || {};
         state.manualMetrics[pid][inp.dataset.m] = inp.value === '' ? null : parseFloat(inp.value);
@@ -878,13 +954,19 @@
 
     var queue = {};
     var queueMsgs = [];
-    Object.keys(state.ready).forEach(function (t) {
-      var got = normQueue(state.ready[t]);
+    var qs = queueList();
+    Object.keys(state.ready).forEach(function (key) {
+      var parts = String(key).split(':');
+      var qk = parts.length > 1 ? parts[0] : 'cpu', t = +parts[parts.length - 1];
+      var q = qs.filter(function (x) { return x.key === qk; })[0];
+      if (!q) return;
+      var got = normQueue(state.ready[key]);
       if (!got.length) return;
-      var exp = normQueue(queueNames(+t));
+      var exp = normQueue(queueNames(q.timeline, t));
       var right = got.length === exp.length && got.every(function (n, i) { return n === exp[i]; });
-      queue[t] = right;
-      if (!right) queueMsgs.push('t=' + t + ': la cola de listos es ' + (exp.join(', ') || '(vacía)') + ' y pusiste ' + got.join(', ') + '.');
+      queue[key] = right;
+      if (!right) queueMsgs.push('t=' + t + ', cola de ' + (qk === 'cpu' ? 'listos' : q.label) + ': es '
+        + (exp.join(', ') || '(vacía)') + ' y pusiste ' + got.join(', ') + '.');
     });
 
     state.diff = { wrong: wrong, messages: messages, metricMsgs: metricMsgs, metrics: metrics,
@@ -915,6 +997,30 @@
       html += '<p class="hint">Tip: pasá a "Automático" para ver la solución completa con el log de eventos.</p>';
     }
     fb.innerHTML = html;
+  }
+
+  /* ---------------- paso a paso ---------------- */
+
+  function setStep(t) {
+    var max = state.auto ? state.auto.totalTime - 1 : 0;
+    state.step = t == null ? null : Math.min(max, Math.max(0, t));
+    render();
+  }
+
+  function renderStep() {
+    var on = state.step != null;
+    $('step-controls').classList.toggle('hidden', !on);
+    $('step-toggle').classList.toggle('primary', on);
+    $('step-events').textContent = '';
+    if (!on) return;
+    var max = state.auto.totalTime - 1;
+    $('step-label').textContent = 't = ' + state.step;
+    $('step-prev').disabled = state.step === 0;
+    $('step-first').disabled = state.step === 0;
+    $('step-next').disabled = state.step === max;
+    $('step-last').disabled = state.step === max;
+    var msgs = state.auto.events.filter(function (e) { return e.t === state.step; }).map(function (e) { return e.msg; });
+    $('step-events').textContent = msgs.length ? msgs.join(' · ') : 'Sin novedades en este instante.';
   }
 
   function renderLog() {
@@ -1125,7 +1231,10 @@
     state.manual = m.cells || {};
     state.markers = m.markers || {};
     state.manualMetrics = m.metrics || {};
-    state.ready = m.ready || {};
+    state.ready = {};
+    Object.keys(m.ready || {}).forEach(function (k) {     // antes sólo existía la cola de la CPU
+      state.ready[k.indexOf(':') < 0 ? 'cpu:' + k : k] = m.ready[k];
+    });
     state.horizon = Math.min(MAX_T, Math.max(m.horizon || 0, minHorizon(), state.auto.totalTime + 4, 16));
     state.diff = null;
     render();
@@ -1225,7 +1334,40 @@
   $('mode-manual').addEventListener('click', function () { setMode('manual'); });
   $('mode-auto').addEventListener('click', function () { setMode('auto'); });
   $('btn-check').addEventListener('click', check);
-  $('btn-clear').addEventListener('click', function () { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.ready = {}; state.diff = null; render(); });
+  $('btn-clear').addEventListener('click', function () {
+    pushHistory();
+    state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.ready = {}; state.diff = null;
+    render();
+  });
+  $('btn-undo').addEventListener('click', undo);
+  $('btn-redo').addEventListener('click', redo);
+  document.addEventListener('focusout', function () { history.typing = false; });
+
+  // Ctrl+Z / Ctrl+Y fuera de los campos de texto (dentro funciona el deshacer del navegador)
+  window.addEventListener('keydown', function (e) {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    var k = String(e.key).toLowerCase();
+    if (k !== 'z' && k !== 'y') return;
+    var el = document.activeElement;
+    if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+    e.preventDefault();
+    if (k === 'y' || e.shiftKey) redo(); else undo();
+  });
+
+  // ← → recorren los instantes en el modo paso a paso
+  window.addEventListener('keydown', function (e) {
+    if (state.step == null || e.ctrlKey || e.metaKey || e.altKey) return;
+    var el = document.activeElement;
+    if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); setStep(state.step - 1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); setStep(state.step + 1); }
+  });
+
+  $('step-toggle').addEventListener('click', function () { setStep(state.step == null ? 0 : null); });
+  $('step-first').addEventListener('click', function () { setStep(0); });
+  $('step-prev').addEventListener('click', function () { setStep(state.step - 1); });
+  $('step-next').addEventListener('click', function () { setStep(state.step + 1); });
+  $('step-last').addEventListener('click', function () { setStep(state.auto.totalTime - 1); });
   $('horizon-stepper').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-d]');
     if (!b) return;
@@ -1393,6 +1535,7 @@
   // arranque
   $('theme-toggle').title = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Tema oscuro (clic para claro)' : 'Tema claro (clic para oscuro)';
   themeIcon();
+  renderUndo();
   var restored = false;
   try {
     var raw = localStorage.getItem('rplanif.snapshot');

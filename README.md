@@ -63,10 +63,20 @@ internet: no usa ninguna librería externa y todo lo que cargues queda en tu nav
 5. **Tema**: el botón de la barra superior alterna claro / oscuro. Por defecto sigue la
    preferencia del sistema y recuerda tu elección.
 
-6. **Cola de listos**: al lado de la tabla de tiempos. En Automático muestra, instante
-   por instante, quiénes esperan la CPU y en qué orden los tomaría el planificador (sin
-   el que la está usando ni los que están en E/S) — es lo que hace falta para resolver
-   los empates. En Manual la completás vos y "Corregir" la revisa.
+6. **Colas**: al lado de la tabla de tiempos, con **una columna por cola**: la de listos
+   (CPU) y la de cada recurso de E/S. En Automático muestra, instante por instante,
+   quiénes esperan y en qué orden los tomaría ese planificador (sin el que está siendo
+   atendido) — es lo que hace falta para resolver los empates. En Manual las completás
+   vos y "Corregir" las revisa.
+
+   En **Automático** está además el **⏯ Paso a paso**: el diagrama se dibuja sólo hasta
+   el instante actual, la columna y la fila de las colas quedan resaltadas, y arriba se
+   narra qué pasa en ese instante (quién toma la CPU, quién pide E/S, a quién expulsan).
+   Se mueve con ⏮ ◀ ▶ ⏭ o con las flechas ← →.
+
+   En **Manual**, **Ctrl+Z** deshace y **Ctrl+Y** rehace (también con los botones ↶ ↷):
+   cubre lo pintado, los marcadores, los tiempos, las colas y el "Limpiar". Dentro de un
+   campo de texto funciona el deshacer del navegador.
 
 7. **Calculadora**: a la derecha de la cola de listos, para las cuentas de T<sub>R</sub>,
    T<sub>E</sub> y los promedios. Los botones **→ TPR** y **→ TPE** mandan el resultado

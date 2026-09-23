@@ -145,7 +145,7 @@
     });
 
     function makeServer(name, pol, isCPU) {
-      return { name: name, pol: pol, isCPU: !!isCPU, queue: [], busy: null, preempted: null, timeline: [] };
+      return { name: name, pol: pol, isCPU: !!isCPU, queue: [], busy: null, preempted: null, timeline: [], queueTimeline: [] };
     }
 
     var cpu = makeServer('CPU', normalizePolicy(cfg, true), true);
@@ -265,7 +265,10 @@
       procs.forEach(function (p) { p.timeline[t] = snapshot(p); });
       cpu.timeline[t] = cpu.busy ? cpu.busy.pid : null;
       readyTimeline[t] = cpu.queue.map(function (p) { return p.pid; });
-      resourceList.forEach(function (r) { r.timeline[t] = r.busy ? r.busy.pid : null; });
+      resourceList.forEach(function (r) {
+        r.timeline[t] = r.busy ? r.busy.pid : null;
+        r.queueTimeline[t] = r.queue.map(function (p) { return p.pid; });
+      });
 
       // 5) Ejecución del instante y transiciones al final del mismo.
       runTick(cpu, t);
@@ -285,7 +288,8 @@
       algorithm: cfg.algorithm,
       procs: out,
       resources: resourceList.map(function (r) {
-        return { name: r.name, timeline: r.timeline, algorithm: r.pol.algorithm, quantum: r.pol.quantum };
+        return { name: r.name, timeline: r.timeline, queueTimeline: r.queueTimeline,
+                 algorithm: r.pol.algorithm, quantum: r.pol.quantum };
       }),
       cpuTimeline: cpu.timeline,
       readyTimeline: readyTimeline,
