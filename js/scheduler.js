@@ -67,73 +67,155 @@
     }
   }
 
+  /* ---------------- políticas ----------------
+   * La CPU y cada recurso son lo mismo: una cola con una política. Estas funciones no
+   * saben a qué servidor pertenece la cola, así que sirven para las dos.
+   */
+
+  function normalizePolicy(raw, allowQueues) {
+    raw = raw || {};
+    var alg = ALGORITHMS[raw.algorithm] ? raw.algorithm : 'FIFO';
+    // Las colas multinivel usan el nivel del proceso, que pertenece a la cola de listos:
+    // un recurso no puede degradar a un proceso, así que ahí se ignoran.
+    if (alg === 'MLFQ' && !allowQueues) alg = 'FIFO';
+    return {
+      algorithm: alg,
+      quantum: Math.max(1, parseInt(raw.quantum, 10) || 1),
+      preemptive: alg === 'SRTF' || alg === 'MLFQ' || (alg === 'PRIORITY' && !!raw.preemptive),
+      queues: alg === 'MLFQ' ? normalizeQueues(raw.queues) : null,
+      preemptedOrder: PREEMPTED_ORDERS[raw.preemptedOrder] ? raw.preemptedOrder : 'tiebreak',
+    };
+  }
+
+  function sortKey(pol, p) {
+    if (pol.algorithm === 'SJF' || pol.algorithm === 'SRTF') return [p.remaining, p.arrival, p.pid];
+    if (pol.algorithm === 'PRIORITY') return [p.priority, p.arrival, p.pid];
+    return null;
+  }
+
+  function better(pol, a, b) {
+    var ka = sortKey(pol, a), kb = sortKey(pol, b);
+    for (var i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] < kb[i];
+    return false;
+  }
+
+  // Índice del próximo proceso a atender, o -1 si la cola está vacía.
+  function pickIndex(pol, queue) {
+    if (!queue.length) return -1;
+    if (pol.algorithm === 'FIFO' || pol.algorithm === 'RR') return 0;
+    var best = 0;
+    for (var i = 1; i < queue.length; i++) {
+      if (pol.algorithm === 'MLFQ') { if (queue[i].level < queue[best].level) best = i; }
+      else if (better(pol, queue[i], queue[best])) best = i;
+    }
+    return best;
+  }
+
+  // Sólo se expulsa si el candidato es ESTRICTAMENTE mejor: en empate sigue el que está.
+  function shouldPreempt(pol, cand, cur) {
+    if (pol.algorithm === 'SRTF') return cand.remaining < cur.remaining;
+    if (pol.algorithm === 'PRIORITY') return cand.priority < cur.priority;
+    if (pol.algorithm === 'MLFQ') return cand.level < cur.level;
+    return false;
+  }
+
+  function quantumFor(pol, p) {
+    if (pol.algorithm === 'RR') return pol.quantum;
+    if (pol.algorithm === 'MLFQ') { var q = pol.queues[p.level].quantum; return q == null ? Infinity : q; }
+    return Infinity;
+  }
+
   function simulate(def, cfg) {
     cfg = cfg || {};
-    var alg = cfg.algorithm;
-    if (!ALGORITHMS[alg]) throw new Error('Algoritmo desconocido: ' + alg);
-    var quantum = Math.max(1, parseInt(cfg.quantum, 10) || 1);
-    var queues = alg === 'MLFQ' ? normalizeQueues(cfg.queues) : null;
-    var preemptive = alg === 'SRTF' || alg === 'MLFQ' || (alg === 'PRIORITY' && !!cfg.preemptive);
-    var preemptedOrder = PREEMPTED_ORDERS[cfg.preemptedOrder] ? cfg.preemptedOrder : 'tiebreak';
+    if (!ALGORITHMS[cfg.algorithm]) throw new Error('Algoritmo desconocido: ' + cfg.algorithm);
     var maxTicks = cfg.maxTicks || 5000;
+    var resCfg = cfg.resources || {};
 
     var procs = def.tasks.map(function (t, i) {
       return {
         pid: i + 1, name: String(t.name), arrival: t.arrival, priority: t.priority || 0,
         bursts: t.bursts, idx: 0, remaining: t.bursts[0].dur,
+        // Un proceso usa un solo servidor a la vez (o la CPU, o un recurso), así que el
+        // contador de quantum puede ser un único campo del proceso.
         state: 'new', level: 0, quantumLeft: Infinity, keepQuantum: false,
         finish: null,
         tcpu: t.bursts.reduce(function (s, b) { return s + (b.type === 'cpu' ? b.dur : 0); }, 0),
         timeline: [],
       };
     });
+
+    function makeServer(name, pol, isCPU) {
+      return { name: name, pol: pol, isCPU: !!isCPU, queue: [], busy: null, preempted: null, timeline: [] };
+    }
+
+    var cpu = makeServer('CPU', normalizePolicy(cfg, true), true);
     var resources = {};
-    def.resources.forEach(function (r) { resources[r] = { name: r, busy: null, queue: [], timeline: [] }; });
+    def.resources.forEach(function (r) { resources[r] = makeServer(r, normalizePolicy(resCfg[r], false)); });
     var resourceList = Object.keys(resources).map(function (k) { return resources[k]; });
 
-    var ready = [];
-    var running = null;
-    var preempted = null;      // expulsado por quantum al final del instante anterior
     var pendingReady = [];     // terminaron E/S al final del instante anterior
     var pendingIO = [];        // terminaron CPU y piden E/S
-    var cpuTimeline = [];
-    var readyTimeline = [];      // quiénes esperan la CPU en cada instante, en orden de cola
+    var readyTimeline = [];    // quiénes esperan la CPU en cada instante, en orden de cola
     var events = [];
     function log(t, msg) { events.push({ t: t, msg: msg }); }
 
-    function quantumFor(p) {
-      if (alg === 'RR') return quantum;
-      if (alg === 'MLFQ') { var q = queues[p.level].quantum; return q == null ? Infinity : q; }
-      return Infinity;
+    // Entran a la cola los que llegan en este instante y el expulsado por quantum,
+    // ordenados según la convención elegida.
+    function enqueue(server, incoming) {
+      incoming = incoming.slice();
+      if (server.preempted && server.pol.preemptedOrder === 'tiebreak') { incoming.push(server.preempted); server.preempted = null; }
+      incoming.sort(byArrivalPid);
+      if (server.preempted && server.pol.preemptedOrder === 'first') { server.queue.push(server.preempted); server.preempted = null; }
+      server.queue = server.queue.concat(incoming);
+      if (server.preempted) { server.queue.push(server.preempted); server.preempted = null; }
     }
 
-    function sortKey(p) {
-      if (alg === 'SJF' || alg === 'SRTF') return [p.remaining, p.arrival, p.pid];
-      if (alg === 'PRIORITY') return [p.priority, p.arrival, p.pid];
-      return null;
-    }
-    function less(a, b) {
-      var ka = sortKey(a), kb = sortKey(b);
-      for (var i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] < kb[i];
-      return false;
-    }
-
-    function pickIndex() {
-      if (!ready.length) return -1;
-      if (alg === 'FIFO' || alg === 'RR') return 0;
-      var best = 0;
-      for (var i = 1; i < ready.length; i++) {
-        if (alg === 'MLFQ') { if (ready[i].level < ready[best].level) best = i; }
-        else if (less(ready[i], ready[best])) best = i;
+    function dispatch(server, t) {
+      if (server.busy && server.pol.preemptive) {
+        var ci = pickIndex(server.pol, server.queue);
+        if (ci >= 0 && shouldPreempt(server.pol, server.queue[ci], server.busy)) {
+          log(t, 'Tarea ' + server.queue[ci].name + ' expulsa a ' + server.busy.name + (server.isCPU ? '' : ' en ' + server.name));
+          server.busy.state = server.isCPU ? 'ready' : 'wait';
+          server.busy.keepQuantum = true;
+          server.queue.unshift(server.busy);
+          server.busy = null;
+        }
       }
-      return best;
+      if (server.busy) return;
+      var di = pickIndex(server.pol, server.queue);
+      if (di < 0) return;
+      var p = server.queue.splice(di, 1)[0];
+      server.busy = p;
+      p.state = server.isCPU ? 'running' : 'io';
+      if (!p.keepQuantum) p.quantumLeft = quantumFor(server.pol, p);
+      p.keepQuantum = false;
+      var counter = isFinite(p.quantumLeft) ? ' [contador=' + p.quantumLeft + ']' : '';
+      log(t, server.isCPU
+        ? 'Tarea ' + p.name + ' toma la CPU' + (server.pol.algorithm === 'MLFQ' ? ' (Q' + p.level + ')' : '') + counter
+        : 'Tarea ' + p.name + ' inicia E/S en ' + server.name + counter);
     }
 
-    function shouldPreempt(cand, run) {
-      if (alg === 'SRTF') return cand.remaining < run.remaining;
-      if (alg === 'PRIORITY') return cand.priority < run.priority;
-      if (alg === 'MLFQ') return cand.level < run.level;
-      return false;
+    function runTick(server, t) {
+      var p = server.busy;
+      if (!p) return;
+      p.remaining--;
+      if (p.remaining === 0) {
+        if (!server.isCPU) log(t + 1, 'Tarea ' + p.name + ' termina E/S en ' + server.name);
+        advance(p, t + 1);
+        server.busy = null;
+        return;
+      }
+      if (!isFinite(p.quantumLeft)) return;
+      p.quantumLeft--;
+      if (p.quantumLeft > 0) return;
+      log(t + 1, 'Tarea ' + p.name + ' agota su quantum' + (server.isCPU ? '' : ' en ' + server.name));
+      p.state = server.isCPU ? 'ready' : 'wait';
+      if (server.isCPU && server.pol.algorithm === 'MLFQ' && p.level < server.pol.queues.length - 1) {
+        p.level++;
+        log(t + 1, 'Tarea ' + p.name + ' baja a la cola Q' + p.level);
+      }
+      server.preempted = p;
+      server.busy = null;
     }
 
     // El proceso terminó su ráfaga actual al final del instante (time-1).
@@ -162,83 +244,32 @@
     while (procs.some(function (p) { return p.state !== 'done'; })) {
       if (t >= maxTicks) throw new Error('La simulación supera ' + maxTicks + ' instantes; revisá la definición.');
 
-      // 1) Llegadas y retornos de E/S entran a la cola de listos (empate: llegada, PID).
-      var incoming = procs
+      // 1) Llegadas y retornos de E/S entran a la cola de listos.
+      var arriving = procs
         .filter(function (p) { return p.state === 'new' && p.arrival === t; })
         .filter(function (p) { return admit(p, t); });
-      incoming = incoming.concat(pendingReady); pendingReady = [];
-      //    El expulsado por quantum entra junto con ellos según la convención elegida.
-      if (preempted && preemptedOrder === 'tiebreak') { incoming.push(preempted); preempted = null; }
-      incoming.sort(byArrivalPid);
-      if (preempted && preemptedOrder === 'first') { ready.push(preempted); preempted = null; }
-      ready = ready.concat(incoming);
-      if (preempted) { ready.push(preempted); preempted = null; }
+      enqueue(cpu, arriving.concat(pendingReady));
+      pendingReady = [];
 
       // 2) Pedidos de E/S → cola del recurso correspondiente.
-      pendingIO.sort(byArrivalPid).forEach(function (p) { resources[p.bursts[p.idx].resource].queue.push(p); });
+      resourceList.forEach(function (r) {
+        enqueue(r, pendingIO.filter(function (p) { return p.bursts[p.idx].resource === r.name; }));
+      });
       pendingIO = [];
 
-      // 3) Recursos libres atienden al primero de su cola.
-      resourceList.forEach(function (r) {
-        if (!r.busy && r.queue.length) {
-          r.busy = r.queue.shift(); r.busy.state = 'io';
-          log(t, 'Tarea ' + r.busy.name + ' inicia E/S en ' + r.name);
-        }
-      });
+      // 3) Cada servidor atiende su cola con su propia política.
+      resourceList.forEach(function (r) { dispatch(r, t); });
+      dispatch(cpu, t);
 
-      // 4) Planificación de CPU.
-      if (running && preemptive) {
-        var ci = pickIndex();
-        if (ci >= 0 && shouldPreempt(ready[ci], running)) {
-          log(t, 'Tarea ' + ready[ci].name + ' expulsa a ' + running.name);
-          running.state = 'ready'; running.keepQuantum = true;
-          ready.unshift(running); running = null;
-        }
-      }
-      if (!running) {
-        var di = pickIndex();
-        if (di >= 0) {
-          running = ready.splice(di, 1)[0]; running.state = 'running';
-          if (!running.keepQuantum) running.quantumLeft = quantumFor(running);
-          running.keepQuantum = false;
-          log(t, 'Tarea ' + running.name + ' toma la CPU'
-            + (alg === 'MLFQ' ? ' (Q' + running.level + ')' : '')
-            + (isFinite(running.quantumLeft) ? ' [contador=' + running.quantumLeft + ']' : ''));
-        }
-      }
-
-      // 5) Registro del instante t.
+      // 4) Registro del instante t.
       procs.forEach(function (p) { p.timeline[t] = snapshot(p); });
-      cpuTimeline[t] = running ? running.pid : null;
-      readyTimeline[t] = ready.map(function (p) { return p.pid; });
+      cpu.timeline[t] = cpu.busy ? cpu.busy.pid : null;
+      readyTimeline[t] = cpu.queue.map(function (p) { return p.pid; });
       resourceList.forEach(function (r) { r.timeline[t] = r.busy ? r.busy.pid : null; });
 
-      // 6) Ejecución del instante t y transiciones al final del mismo.
-      if (running) {
-        running.remaining--;
-        if (running.remaining === 0) {
-          advance(running, t + 1); running = null;
-        } else if (isFinite(running.quantumLeft)) {
-          running.quantumLeft--;
-          if (running.quantumLeft === 0) {
-            log(t + 1, 'Tarea ' + running.name + ' agota su quantum');
-            running.state = 'ready';
-            if (alg === 'MLFQ' && running.level < queues.length - 1) {
-              running.level++;
-              log(t + 1, 'Tarea ' + running.name + ' baja a la cola Q' + running.level);
-            }
-            preempted = running; running = null;
-          }
-        }
-      }
-      resourceList.forEach(function (r) {
-        if (!r.busy) return;
-        r.busy.remaining--;
-        if (r.busy.remaining === 0) {
-          log(t + 1, 'Tarea ' + r.busy.name + ' termina E/S en ' + r.name);
-          advance(r.busy, t + 1); r.busy = null;
-        }
-      });
+      // 5) Ejecución del instante y transiciones al final del mismo.
+      runTick(cpu, t);
+      resourceList.forEach(function (r) { runTick(r, t); });
       t++;
     }
 
@@ -251,10 +282,12 @@
     });
     var n = out.length;
     return {
-      algorithm: alg,
+      algorithm: cfg.algorithm,
       procs: out,
-      resources: resourceList.map(function (r) { return { name: r.name, timeline: r.timeline }; }),
-      cpuTimeline: cpuTimeline,
+      resources: resourceList.map(function (r) {
+        return { name: r.name, timeline: r.timeline, algorithm: r.pol.algorithm, quantum: r.pol.quantum };
+      }),
+      cpuTimeline: cpu.timeline,
       readyTimeline: readyTimeline,
       totalTime: t,
       events: events,

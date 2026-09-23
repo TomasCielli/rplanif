@@ -37,6 +37,11 @@ internet: no usa ninguna librería externa y todo lo que cargues queda en tu nav
    no). Las colas multinivel están implementadas pero ocultas porque la práctica de la
    comisión no las usa (`ALGORITHMS.MLFQ.hidden` en `js/scheduler.js`).
 
+   Cada **recurso de E/S tiene su propia cola y su propio algoritmo** — el apunte lo dice
+   así: *un scheduler por cada cola*. Debajo de la política de CPU aparece una fila por
+   recurso para elegir la suya (FIFO por defecto). Con RR el quantum también parte la
+   ráfaga de E/S, igual que en la CPU.
+
 3. **Manual**: elegí un pincel (CPU, E/S en cada recurso, ▲ Llegada, ▼ Fin, Borrar) y
    pintá las celdas con clic o arrastrando. Los marcadores se colocan de a uno sobre el
    borde izquierdo de la celda: ▲ en el instante en que el proceso llega al sistema y

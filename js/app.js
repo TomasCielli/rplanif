@@ -129,12 +129,17 @@
     if (next) { next.focus(); next.select(); }
   }
 
+  // Nombres cortos para el selector de cada recurso (el panel es angosto).
+  var ALG_SHORT = { FIFO: 'FIFO', SJF: 'SJF', SRTF: 'SRTF', RR: 'RR', PRIORITY: 'Prioridades' };
+  function algShort(k) { return ALG_SHORT[k] || (QP.ALGORITHMS[k] ? QP.ALGORITHMS[k].label : k); }
+
   var state = {
     def: null, cfg: null, auto: null,
     // modelo editable de la tabla: bursts como string con el formato de entrada
     table: { resources: [], tasks: [] },
     // manual: celdas pintadas y marcadores (▲ llegada, ▼ fin) por "pid:t"
     manual: {}, markers: {}, manualMetrics: {}, ready: {},
+    resPolicies: {},   // política de la cola de cada recurso de E/S
     mode: 'manual', brush: 'cpu', horizon: 20,
     diff: null, painting: false,
   };
@@ -156,6 +161,7 @@
       preemptive: $('preemptive').checked,
       queues: parseQueues($('queues').value),
       preemptedOrder: $('preempted-order').value,
+      resources: state.resPolicies,
     };
   }
 
@@ -165,6 +171,14 @@
     if (cfg.algorithm === 'PRIORITY') a += cfg.preemptive ? ' · apropiativo' : ' · no apropiativo';
     if (cfg.algorithm === 'MLFQ') a += ' · ' + cfg.queues.map(function (q, i) { return 'Q' + i + '=' + (q.quantum == null ? 'FCFS' : 'RR q' + q.quantum); }).join(', ');
     if (cfg.algorithm === 'RR' || cfg.algorithm === 'MLFQ') a += ' · expulsado: ' + { tiebreak: 'por desempate', last: 'al final', first: 'primero' }[cfg.preemptedOrder];
+    var custom = (state.def ? state.def.resources : []).filter(function (r) {
+      return cfg.resources[r] && cfg.resources[r].algorithm !== 'FIFO';
+    });
+    if (custom.length) a += ' · ' + custom.map(function (r) {
+      var p = cfg.resources[r];
+      return r + ': ' + algShort(p.algorithm) + (p.algorithm === 'RR' ? ' q=' + p.quantum : '')
+        + (p.algorithm === 'PRIORITY' && p.preemptive ? ' apropiativo' : '');
+    }).join(', ');
     return a;
   }
 
@@ -175,6 +189,50 @@
     $('queues-row').classList.toggle('hidden', alg !== 'MLFQ');
     $('preempted-order-row').classList.toggle('hidden', alg !== 'RR' && alg !== 'MLFQ');
     $('algorithm-hint').textContent = HINTS[alg] || '';
+  }
+
+  /* ---------------- política de cada recurso ---------------- */
+
+  function resPolicy(name) {
+    if (!state.resPolicies[name]) state.resPolicies[name] = { algorithm: 'FIFO', quantum: 2, preemptive: false };
+    return state.resPolicies[name];
+  }
+
+  function renderResourcePolicies() {
+    var box = $('resource-policies');
+    var list = state.def ? state.def.resources : [];
+    box.classList.toggle('hidden', !list.length);
+    if (!list.length) { box.innerHTML = ''; return; }
+    var opts = Object.keys(QP.ALGORITHMS).filter(function (k) { return !QP.ALGORITHMS[k].hidden; });
+
+    box.innerHTML = '<span class="tools-label">Cola de cada recurso de E/S</span>' + list.map(function (r) {
+      var pol = resPolicy(r);
+      return '<div class="res-row"><b title="' + escapeAttr(r) + '">' + escapeHtml(r) + '</b>'
+        + '<select data-r="' + escapeAttr(r) + '" data-k="algorithm">'
+        + opts.map(function (k) {
+            return '<option value="' + k + '"' + (pol.algorithm === k ? ' selected' : '') + '>' + escapeHtml(algShort(k)) + '</option>';
+          }).join('')
+        + '</select>'
+        + (pol.algorithm === 'RR'
+            ? '<input class="q" title="Quantum del recurso" data-cap="int" data-max="999" inputmode="numeric" data-r="' + escapeAttr(r) + '" data-k="quantum" value="' + pol.quantum + '">'
+            : '')
+        + (pol.algorithm === 'PRIORITY'
+            ? '<label class="tiny"><input type="checkbox" data-r="' + escapeAttr(r) + '" data-k="preemptive"' + (pol.preemptive ? ' checked' : '') + '> apropiativo</label>'
+            : '')
+        + '</div>';
+    }).join('');
+
+    box.querySelectorAll('select, input').forEach(function (el) {
+      if (el.dataset.k === 'quantum') el.addEventListener('input', function () { capInput(el); });
+      el.addEventListener('change', function () {
+        var pol = resPolicy(el.dataset.r);
+        if (el.dataset.k === 'preemptive') pol.preemptive = el.checked;
+        else if (el.dataset.k === 'quantum') pol.quantum = Math.max(1, parseInt(capInput(el), 10) || 1);
+        else pol.algorithm = el.value;
+        renderResourcePolicies();     // el algoritmo elegido cambia qué controles hacen falta
+        if (state.def) load('table');
+      });
+    });
   }
 
   /* ---------------- carga (código ⇄ tabla) ---------------- */
@@ -200,6 +258,7 @@
     if (!sameTasks) { state.manual = {}; state.markers = {}; state.manualMetrics = {}; state.ready = {}; }
 
     state.def = def;
+    renderResourcePolicies();      // crea la política por defecto de los recursos nuevos
     state.cfg = readConfig();
     state.diff = null;
     try {
@@ -422,6 +481,11 @@
     return { up: p.arrival === t, down: p.finish === t };
   }
 
+  function resourceSub(r) {
+    return 'recurso' + (r.algorithm && r.algorithm !== 'FIFO'
+      ? ' · ' + algShort(r.algorithm) + (r.algorithm === 'RR' ? ' q=' + r.quantum : '') : '');
+  }
+
   function renderBrushes() {
     var box = $('brushes');
     box.innerHTML = '';
@@ -495,7 +559,7 @@
     });
 
     if (!editable) {
-      state.auto.resources.forEach(function (r) { addSummaryRow(grid, r.name, 'recurso', T, r.timeline); });
+      state.auto.resources.forEach(function (r) { addSummaryRow(grid, r.name, resourceSub(r), T, r.timeline); });
     }
 
     wrap.innerHTML = '';
@@ -816,6 +880,7 @@
       config: {
         algorithm: $('algorithm').value, quantum: $('quantum').value, preemptive: $('preemptive').checked,
         queues: $('queues').value, preemptedOrder: $('preempted-order').value,
+        resources: state.resPolicies,
       },
       manual: { cells: state.manual, markers: state.markers, metrics: state.manualMetrics, ready: state.ready, horizon: state.horizon },
     };
@@ -861,7 +926,7 @@
         cells: cells, marks: marks,
       });
     });
-    if (!manual) state.auto.resources.forEach(function (r) { rows.push({ label: r.name, sub: 'recurso', summary: r.timeline }); });
+    if (!manual) state.auto.resources.forEach(function (r) { rows.push({ label: r.name, sub: resourceSub(r), summary: r.timeline }); });
     return { T: T, rows: rows, manual: manual };
   }
 
@@ -997,6 +1062,7 @@
     if (c.preemptive != null) $('preemptive').checked = !!c.preemptive;
     if (c.queues != null) $('queues').value = c.queues;
     if (c.preemptedOrder && QP.PREEMPTED_ORDERS[c.preemptedOrder]) $('preempted-order').value = c.preemptedOrder;
+    state.resPolicies = (c.resources && typeof c.resources === 'object') ? c.resources : {};
     syncAlgorithmUI();
     $('definition').value = snap.definition || '';
     if (!load('code')) return false;                // el código del archivo tenía errores: quedan listados

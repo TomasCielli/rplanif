@@ -318,3 +318,11 @@ table:hover .colhead .mv, .colhead .mv:focus-visible { opacity: 1; }
 .readyq-table input:focus { border-color: var(--border); background: var(--panel); }
 .metrics-box .readyq-table input.wrong { border-color: var(--bad); background: var(--bad-bg); }
 .metrics-box .readyq-table input.right { border-color: var(--ok); background: var(--ok-bg); }
+
+/* ---------- Política de cada recurso ---------- */
+.res-policies { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 10px; }
+.res-row { display: flex; align-items: center; gap: 6px; }
+.res-row b { min-width: 48px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-row select { flex: 1; min-width: 0; padding: 3px 6px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; }
+.res-row .q { width: 46px; text-align: center; padding: 3px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; }
+.res-row .tiny { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); white-space: nowrap; }

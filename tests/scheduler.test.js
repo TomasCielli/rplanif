@@ -236,6 +236,60 @@ test('FIFO ejemplo 3: recurso compartido → el segundo espera bloqueado', () =>
   assert.deepEqual(r1.timeline.slice(0, 8), [null, null, null, 1, 1, 1, 2, 2]);
 });
 
+// Tres procesos que se pelean por R1: P1 lo ocupa de t=1 a t=9, P2 lo pide en t=3
+// (su E/S dura 5) y P3 en t=6 (dura 2). Al liberarse en t=9 la cola es [P2, P3].
+const DISPUTA_R1 = `
+RECURSO ''R1''
+TAREA ''1'' INICIO=0 [CPU,1] [1,8] [CPU,1]
+TAREA ''2'' INICIO=0 [CPU,2] [1,5] [CPU,1]
+TAREA ''3'' INICIO=0 [CPU,3] [1,2] [CPU,1]
+`;
+
+const dev = (res, name) => res.resources.find((r) => r.name === name).timeline;
+const devString = (res, name) => dev(res, name).map((pid) => (pid == null ? '-' : String(pid))).join('');
+
+test('cada recurso usa FIFO si no se indica otra cosa', () => {
+  const d = dev(run(DISPUTA_R1, { algorithm: 'FIFO' }), 'R1');
+  assert.equal(d[9], 2);           // entra el que lo pidió primero
+  assert.equal(d[14], 3);
+});
+
+test('un recurso puede planificar su cola con SJF', () => {
+  const d = dev(run(DISPUTA_R1, { algorithm: 'FIFO', resources: { R1: { algorithm: 'SJF' } } }), 'R1');
+  assert.equal(d[9], 3);           // la E/S más corta primero
+  assert.equal(d[10], 3);
+  assert.equal(d[11], 2);
+});
+
+test('un recurso puede planificar su cola con RR: el quantum también parte la E/S', () => {
+  const res = run(DISPUTA_R1, { algorithm: 'FIFO', resources: { R1: { algorithm: 'RR', quantum: 2 } } });
+  // La E/S de 8 instantes de P1 deja de ser continua: el recurso se reparte en tramos de 2
+  // y el expulsado vuelve a la cola con el mismo desempate que usa la cola de listos.
+  assert.equal(devString(res, 'R1'), '-111122113322112-');
+  // el reparto cambia el orden, no el trabajo: cada uno usa sus instantes de E/S completos
+  [[1, 8], [2, 5], [3, 2]].forEach(function ([pid, total]) {
+    assert.equal(dev(res, 'R1').filter((x) => x === pid).length, total);
+  });
+});
+
+test('un recurso con prioridades atiende primero al de mayor prioridad', () => {
+  const src = `
+RECURSO ''R1''
+TAREA ''1'' PRIORIDAD=1 INICIO=0 [CPU,1] [1,8] [CPU,1]
+TAREA ''2'' PRIORIDAD=3 INICIO=0 [CPU,2] [1,5] [CPU,1]
+TAREA ''3'' PRIORIDAD=2 INICIO=0 [CPU,3] [1,2] [CPU,1]
+`;
+  const d = dev(run(src, { algorithm: 'FIFO', resources: { R1: { algorithm: 'PRIORITY' } } }), 'R1');
+  assert.equal(d[9], 3);           // P3 (prioridad 2) antes que P2 (prioridad 3)
+});
+
+test('la política de un recurso no afecta a los demás ni a la CPU', () => {
+  const a = run(EJEMPLO_2, { algorithm: 'FIFO' });
+  const b = run(EJEMPLO_2, { algorithm: 'FIFO', resources: { R2: { algorithm: 'SJF' } } });
+  assert.deepEqual(b.cpuTimeline, a.cpuTimeline);
+  assert.deepEqual(b.procs.map((p) => p.finish), a.procs.map((p) => p.finish));
+});
+
 test('SRTF con E/S: al volver de E/S con ráfaga corta expulsa', () => {
   const src = `
 RECURSO ''R1''

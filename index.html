@@ -73,6 +73,7 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
           <span>Expulsado por quantum, si en ese instante también entran otros a la cola de listos</span>
           <select id="preempted-order"></select>
         </label>
+        <div id="resource-policies" class="res-policies hidden"></div>
         <p id="algorithm-hint" class="hint"></p>
       </details>
 
@@ -82,7 +83,7 @@ TAREA ''1'' PRIORIDAD=2 INICIO=0
           <ul>
             <li>▲ marca la llegada del proceso al sistema (INICIO); ▼ marca el instante en que termina por completo. Ambos van sobre la línea de tiempo, no dentro de una celda, y hay uno solo de cada por proceso (poner otro mueve el anterior).</li>
             <li>Instante <em>t</em> = intervalo [t, t+1). Una ráfaga que termina al final de <em>t</em> deja al proceso listo desde <em>t+1</em>.</li>
-            <li>E/S en paralelo con la CPU. Cada recurso atiende de a uno, con cola FIFO. Si el recurso está ocupado, el proceso <strong>espera bloqueado</strong>.</li>
+            <li>E/S en paralelo con la CPU. Cada recurso atiende de a uno y tiene <strong>su propia cola con su propio algoritmo</strong> (el apunte: un scheduler por cada cola); si está ocupado, el proceso <strong>espera bloqueado</strong>.</li>
             <li>Desempate: orden de llegada al sistema (INICIO), luego PID.</li>
             <li>RR con <strong>timer variable</strong>: el contador arranca en Q cada vez que un proceso toma la CPU. Si el expulsado por quantum coincide con llegadas o retornos de E/S, se encola según la opción elegida (por defecto: se ordena con ellos por llegada y PID).</li>
             <li>Prioridades: <strong>menor valor = mayor prioridad</strong>.</li>
