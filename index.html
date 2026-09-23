@@ -34,7 +34,7 @@
           </label>
           <table class="proc-table" id="proc-table"></table>
           <button id="btn-add-task" class="wide">+ Agregar proceso</button>
-          <p class="hint">Ráfagas: <code>[CPU,3] [R1,2] [CPU,2]</code> — CPU o nombre/índice del recurso, y duración. Con ◂ ▸ movés las columnas y con ↑ ↓ recorrés la tabla.</p>
+          <p class="hint"><b>CPU</b> es el tiempo total de procesador. <b>E/S</b> usa la notación del apunte <code>(recurso, instante, duración)</code>: <code>(R1,3,2)</code> = usa R1 cuando ya consumió 3 de CPU, durante 2 instantes. Podés poner varias: <code>(R1,3,2) (R2,7,1)</code>. Las ráfagas se arman solas. Con ◂ ▸ movés las columnas y con ↑ ↓ recorrés la tabla.</p>
         </div>
 
         <div id="code-view" class="hidden">

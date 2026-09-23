@@ -12,9 +12,15 @@ La idea: **dibujás el diagrama a mano, después lo corregís con el simulador.*
 instalar nada. También podés abrir `index.html` en cualquier navegador, incluso sin
 internet: no usa ninguna librería externa y todo lo que cargues queda en tu navegador.
 
-1. **Procesos**: editá la **tabla** (Job, Llegada, Prio, Ráfagas; agregar / eliminar
+1. **Procesos**: editá la **tabla** (Job, Llegada, Prio, CPU, E/S; agregar / eliminar
    procesos; recursos separados por coma), escribí el **código** con el formato de
    qplanif, o **importá un archivo** (ver más abajo).
+
+   La tabla usa la misma notación que el apunte: **CPU** es el tiempo total de procesador
+   y **E/S** se escribe `(recurso, instante, duración)`, donde el *instante* es el tiempo
+   de CPU que el proceso ya consumió. Con CPU=5 y `(R1,3,2)` las ráfagas quedan
+   `[CPU,3] [R1,2] [CPU,2]` — es decir, copiás la tabla del enunciado tal cual y el
+   código de qplanif se arma solo. Podés poner varias E/S: `(R1,3,2) (R2,7,1)`.
 
    En las dos tablas (Procesos y Tiempos): con **◂ ▸** en el encabezado movés cada
    columna y el orden se recuerda, y **↑ ↓** (o Enter) recorren la columna en vez de

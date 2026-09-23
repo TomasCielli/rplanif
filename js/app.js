@@ -34,6 +34,7 @@
     int:     /[^\d]/g,                          // sin signo ni punto: no hay negativos posibles
     decimal: /[^\d.,]/g,
     bursts:  /[^A-Za-z0-9_.\-,\[\] ]/g,
+    io:      /[^A-Za-z0-9_.\-,() ]/g,
     queue:   /[^A-Za-z0-9_.\- ,;]/g,
     queues:  /[^0-9,\- ]/g,                     // quantums por cola: "8,16,-"
     calc:    /[^0-9+\-*\/().,×÷− ]/g,
@@ -69,9 +70,11 @@
     name:     { label: 'Job',     cls: 'num', maxlength: 12 },
     arrival:  { label: 'Llegada', cls: 'num', cap: 'int', max: MAX_T },
     priority: { label: 'Prio',    cls: 'num', cap: 'int', max: MAX_PRIO },
-    bursts:   { label: 'Ráfagas', cls: 'bursts', cap: 'bursts', maxlength: 200, placeholder: '[CPU,3] [R1,2]' },
+    cpu:      { label: 'CPU',     cls: 'num', cap: 'int', max: MAX_T, title: 'Tiempo total de CPU del proceso' },
+    io:       { label: 'E/S',     cls: 'bursts', cap: 'io', maxlength: 160, placeholder: '(R1,3,2)',
+                title: '(recurso, instante, duración): la E/S ocurre cuando el proceso ya consumió ese tiempo de CPU' },
   };
-  var DEFAULT_COLUMNS = ['name', 'arrival', 'priority', 'bursts'];
+  var DEFAULT_COLUMNS = ['name', 'arrival', 'priority', 'cpu', 'io'];
   var COLUMNS_KEY = 'rplanif.columns';
 
   // Columnas de la tabla de tiempos. 'finish' es la respuesta del alumno y vive en los
@@ -135,7 +138,7 @@
 
   var state = {
     def: null, cfg: null, auto: null,
-    // modelo editable de la tabla: bursts como string con el formato de entrada
+    // modelo editable de la tabla: CPU total + E/S con la notación (recurso, instante, duración)
     table: { resources: [], tasks: [] },
     // manual: celdas pintadas y marcadores (▲ llegada, ▼ fin) por "pid:t"
     manual: {}, markers: {}, manualMetrics: {}, ready: {},
@@ -280,7 +283,8 @@
     state.table = {
       resources: def.resources.slice(),
       tasks: def.tasks.map(function (t) {
-        return { name: t.name, arrival: t.arrival, priority: t.priority, bursts: QP.burstsToString(t.bursts) };
+        var spec = QP.burstsToSpec(t.bursts);
+        return { name: t.name, arrival: t.arrival, priority: t.priority, cpu: spec.cpu, io: QP.ioToString(spec.io) };
       }),
     };
   }
@@ -328,8 +332,14 @@
           inp.classList.toggle('invalid', !!bad);
           if (bad) { showErrors([bad + ' (proceso ' + (i + 1) + ')']); return; }
         }
-        if (f === 'arrival' || f === 'priority') t[f] = parseInt(inp.value, 10) || 0;
+        if (f === 'arrival' || f === 'priority' || f === 'cpu') t[f] = parseInt(inp.value, 10) || 0;
         else t[f] = inp.value.trim();
+        if (f === 'cpu' || f === 'io') {
+          // CPU y E/S se validan juntas: una E/S no puede caer más allá del total de CPU
+          var chk = QP.specToBursts(t.cpu, t.io, state.table.resources);
+          markSpec(i, !chk.errors.length);
+          if (chk.errors.length) { showErrors([chk.errors[0] + ' (proceso ' + t.name + ')']); return; }
+        }
         tableToCode();
       });
     });
@@ -364,14 +374,22 @@
     if (inp) inp.focus();                      // …así que devolvemos el foco al campo
   }
 
+  // Marca (o limpia) los dos campos que definen las ráfagas de un proceso.
+  function markSpec(i, ok) {
+    ['cpu', 'io'].forEach(function (f) {
+      var el = document.querySelector('#proc-table input[data-f="' + f + '"][data-i="' + i + '"]');
+      if (el) el.classList.toggle('invalid', !ok);
+    });
+  }
+
   function addTask() {
     var used = state.table.tasks.map(function (t) { return t.name; });
     var n = 1;
     while (used.indexOf(String(n)) >= 0) n++;
-    state.table.tasks.push({ name: String(n), arrival: 0, priority: 0, bursts: '[CPU,1]' });
+    state.table.tasks.push({ name: String(n), arrival: 0, priority: 0, cpu: 1, io: '' });
     renderTable();
     tableToCode();
-    var inputs = $('proc-table').querySelectorAll('input.bursts');
+    var inputs = $('proc-table').querySelectorAll('input[data-f="cpu"]');
     if (inputs.length) inputs[inputs.length - 1].focus();
   }
 

@@ -2,7 +2,7 @@
 // Ejecutar con:  npm test
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parse, serialize, burstsToString, validateName } = require('../js/parser.js');
+const { parse, serialize, burstsToString, validateName, specToBursts, burstsToSpec, ioToString } = require('../js/parser.js');
 const { simulate } = require('../js/scheduler.js');
 
 const EJEMPLO_1 = `
@@ -118,6 +118,65 @@ test('serialize: código → tabla → código es idempotente (round trip)', () 
   assert.equal(burstsToString(def.tasks[1].bursts), '[CPU,1] [R1,2] [CPU,3]');
   assert.equal(serialize({ resources: ['R1'], tasks: [{ name: 'X', arrival: 2, priority: 1, bursts: '[CPU,4] [1,1]' }] }),
     "RECURSO ''R1''\nTAREA ''X'' PRIORIDAD=1 INICIO=2\n[CPU,4] [1,1]\n");
+});
+
+test('notación (recurso, instante, duración): arma las ráfagas del apunte', () => {
+  // Ejemplo 2 del apunte: Job 1 tiene CPU=5 y E/S (R1, 3, 2)
+  const r = specToBursts(5, '(R1,3,2)', ['R1']);
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.bursts, [
+    { type: 'cpu', dur: 3 }, { type: 'io', resource: 'R1', dur: 2 }, { type: 'cpu', dur: 2 },
+  ]);
+  // el recurso también se puede indicar por su número, como en el formato de qplanif
+  assert.deepEqual(specToBursts(3, '(2,2,3)', ['R1', 'R2']).bursts, [
+    { type: 'cpu', dur: 2 }, { type: 'io', resource: 'R2', dur: 3 }, { type: 'cpu', dur: 1 },
+  ]);
+});
+
+test('notación: varias E/S se ordenan por instante y parten la CPU', () => {
+  const r = specToBursts(10, '(R2,7,1) (R1,3,2)', ['R1', 'R2']);
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.bursts, [
+    { type: 'cpu', dur: 3 }, { type: 'io', resource: 'R1', dur: 2 },
+    { type: 'cpu', dur: 4 }, { type: 'io', resource: 'R2', dur: 1 },
+    { type: 'cpu', dur: 3 },
+  ]);
+});
+
+test('notación: casos borde en 0 y en el total de CPU', () => {
+  assert.deepEqual(specToBursts(4, '(R1,0,2)', ['R1']).bursts, [
+    { type: 'io', resource: 'R1', dur: 2 }, { type: 'cpu', dur: 4 },
+  ]);
+  assert.deepEqual(specToBursts(4, '(R1,4,2)', ['R1']).bursts, [
+    { type: 'cpu', dur: 4 }, { type: 'io', resource: 'R1', dur: 2 },
+  ]);
+  assert.deepEqual(specToBursts(3, '', ['R1']).bursts, [{ type: 'cpu', dur: 3 }]);
+});
+
+test('notación: errores explicativos', () => {
+  assert.match(specToBursts(5, '(R1,9,2)', ['R1']).errors[0], /instante 9.*CPU|supera/i);
+  assert.match(specToBursts(5, '(R9,1,2)', ['R1']).errors[0], /R9/);
+  assert.match(specToBursts(5, '(R1,1,0)', ['R1']).errors[0], /duración/i);
+  assert.match(specToBursts(0, '', ['R1']).errors[0], /CPU/i);
+  assert.match(specToBursts(5, 'R1,1,2', ['R1']).errors[0], /paréntesis|\(/i);
+});
+
+test('notación: ida y vuelta con las ráfagas', () => {
+  const def = parse(EJEMPLO_2);
+  const specs = def.tasks.map((t) => burstsToSpec(t.bursts));
+  assert.deepEqual(specs[0], { cpu: 5, io: [{ resource: 'R1', at: 3, dur: 2 }] });
+  assert.deepEqual(specs[2], { cpu: 3, io: [{ resource: 'R3', at: 2, dur: 3 }] });
+  assert.equal(ioToString(specs[0].io), '(R1,3,2)');
+  // y de vuelta a las mismas ráfagas
+  def.tasks.forEach((t, i) => {
+    assert.deepEqual(specToBursts(specs[i].cpu, ioToString(specs[i].io), def.resources).bursts, t.bursts);
+  });
+});
+
+test('serialize acepta el modelo de la tabla con CPU y E/S', () => {
+  assert.equal(
+    serialize({ resources: ['R1'], tasks: [{ name: '1', arrival: 0, priority: 0, cpu: 5, io: '(R1,3,2)' }] }),
+    `RECURSO ''R1''\nTAREA ''1'' PRIORIDAD=0 INICIO=0\n[CPU,3] [R1,2] [CPU,2]\n`);
 });
 
 test('FIFO ejemplo 1', () => {
