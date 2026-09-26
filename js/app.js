@@ -13,6 +13,7 @@
     SJF: 'Se elige el proceso con la ráfaga de CPU más corta. No apropiativo: el que está en CPU no se interrumpe.',
     SRTF: 'Versión apropiativa de SJF: si llega (o vuelve de E/S) un proceso con menos tiempo restante de ráfaga, expulsa al actual.',
     RR: 'FIFO circular con quantum. Timer variable: el contador arranca en Q cada vez que un proceso toma la CPU.',
+    VRR: 'Round Robin con una cola auxiliar: el que vuelve de E/S entra antes que los demás, pero sólo por lo que le había sobrado del quantum en su ráfaga anterior.',
     PRIORITY: 'Menor valor = mayor prioridad. Si es apropiativo, un proceso de mayor prioridad expulsa al actual al llegar.',
     MLFQ: 'Q0, Q1, … cada una con su quantum (RR) o FCFS. Al agotar el quantum el proceso baja de cola. Una cola superior expulsa a una inferior.',
   };
@@ -133,7 +134,7 @@
   }
 
   // Nombres cortos para el selector de cada recurso (el panel es angosto).
-  var ALG_SHORT = { FIFO: 'FIFO', SJF: 'SJF', SRTF: 'SRTF', RR: 'RR', PRIORITY: 'Prioridades' };
+  var ALG_SHORT = { FIFO: 'FIFO', SJF: 'SJF', SRTF: 'SRTF', RR: 'RR', VRR: 'VRR', PRIORITY: 'Prioridades', MLFQ: 'Multinivel' };
   function algShort(k) { return ALG_SHORT[k] || (QP.ALGORITHMS[k] ? QP.ALGORITHMS[k].label : k); }
 
   var state = {
@@ -171,10 +172,10 @@
 
   function describeConfig(cfg) {
     var a = QP.ALGORITHMS[cfg.algorithm].label;
-    if (cfg.algorithm === 'RR') a += ' · Q=' + cfg.quantum;
+    if (cfg.algorithm === 'RR' || cfg.algorithm === 'VRR') a += ' · Q=' + cfg.quantum;
     if (cfg.algorithm === 'PRIORITY') a += cfg.preemptive ? ' · apropiativo' : ' · no apropiativo';
     if (cfg.algorithm === 'MLFQ') a += ' · ' + cfg.queues.map(function (q, i) { return 'Q' + i + '=' + (q.quantum == null ? 'FCFS' : 'RR q' + q.quantum); }).join(', ');
-    if (cfg.algorithm === 'RR' || cfg.algorithm === 'MLFQ') a += ' · expulsado: ' + { tiebreak: 'por desempate', last: 'al final', first: 'primero' }[cfg.preemptedOrder];
+    if (cfg.algorithm === 'RR' || cfg.algorithm === 'VRR' || cfg.algorithm === 'MLFQ') a += ' · expulsado: ' + { tiebreak: 'por desempate', last: 'al final', first: 'primero' }[cfg.preemptedOrder];
     var custom = (state.def ? state.def.resources : []).filter(function (r) {
       return cfg.resources[r] && cfg.resources[r].algorithm !== 'FIFO';
     });
@@ -188,10 +189,10 @@
 
   function syncAlgorithmUI() {
     var alg = $('algorithm').value;
-    $('quantum-row').classList.toggle('hidden', alg !== 'RR');
+    $('quantum-row').classList.toggle('hidden', alg !== 'RR' && alg !== 'VRR');
     $('preemptive-row').classList.toggle('hidden', alg !== 'PRIORITY');
     $('queues-row').classList.toggle('hidden', alg !== 'MLFQ');
-    $('preempted-order-row').classList.toggle('hidden', alg !== 'RR' && alg !== 'MLFQ');
+    $('preempted-order-row').classList.toggle('hidden', alg !== 'RR' && alg !== 'VRR' && alg !== 'MLFQ');
     $('algorithm-hint').textContent = HINTS[alg] || '';
   }
 
@@ -207,7 +208,7 @@
     var list = state.def ? state.def.resources : [];
     box.classList.toggle('hidden', !list.length);
     if (!list.length) { box.innerHTML = ''; return; }
-    var opts = Object.keys(QP.ALGORITHMS).filter(function (k) { return !QP.ALGORITHMS[k].hidden; });
+    var opts = Object.keys(QP.ALGORITHMS).filter(function (k) { return !QP.ALGORITHMS[k].cpuOnly; });
 
     box.innerHTML = '<span class="tools-label">Cola de cada recurso de E/S</span>' + list.map(function (r) {
       var pol = resPolicy(r);
@@ -759,6 +760,7 @@
   // Una entrada por cola: la de listos (CPU) y la de cada recurso.
   function queueList() {
     var list = [{ key: 'cpu', label: 'CPU', timeline: state.auto.readyTimeline }];
+    if (state.cfg.algorithm === 'VRR') list.push({ key: 'aux', label: 'CPU aux', timeline: state.auto.auxTimeline || [] });
     state.auto.resources.forEach(function (r) {
       list.push({ key: r.name, label: r.name, timeline: r.queueTimeline || [] });
     });
@@ -789,7 +791,7 @@
           }).join('') + '</tr>';
     }
     box.innerHTML = '<table class="readyq-table"><thead><tr><th>t</th>'
-      + qs.map(function (q) { return '<th title="' + escapeAttr(q.key === 'cpu' ? 'Cola de listos' : 'Cola del recurso ' + q.label) + '">' + escapeHtml(q.label) + '</th>'; }).join('')
+      + qs.map(function (q) { return '<th title="' + escapeAttr(q.key === 'cpu' ? 'Cola de listos' : q.key === 'aux' ? 'Cola auxiliar de VRR: los que vuelven de E/S' : 'Cola del recurso ' + q.label) + '">' + escapeHtml(q.label) + '</th>'; }).join('')
       + '</tr></thead><tbody>' + rows + '</tbody></table>'
       + (manual ? '<p class="hint">Una columna por cola: la CPU y cada recurso. Escribí los procesos que esperan, en orden y separados por coma. "Corregir" también las revisa.</p>'
                 : '<p class="hint">Quiénes esperan en cada cola (sin el que está siendo atendido).</p>');
@@ -965,7 +967,7 @@
       var exp = normQueue(queueNames(q.timeline, t));
       var right = got.length === exp.length && got.every(function (n, i) { return n === exp[i]; });
       queue[key] = right;
-      if (!right) queueMsgs.push('t=' + t + ', cola de ' + (qk === 'cpu' ? 'listos' : q.label) + ': es '
+      if (!right) queueMsgs.push('t=' + t + ', cola de ' + (qk === 'cpu' ? 'listos' : qk === 'aux' ? 'auxiliar' : q.label) + ': es '
         + (exp.join(', ') || '(vacía)') + ' y pusiste ' + got.join(', ') + '.');
     });
 

@@ -31,10 +31,13 @@
     SJF:      { label: 'SJF — Shortest Job First',             quantum: false, preemptive: false },
     SRTF:     { label: 'SRTF — Shortest Remaining Time First', quantum: false, preemptive: true },
     RR:       { label: 'Round Robin (timer variable)',         quantum: true,  preemptive: false },
+    // VRR: RR con una cola auxiliar para los que vuelven de E/S. Tienen prioridad y se
+    // llevan sólo lo que les había sobrado del quantum en su ráfaga anterior.
+    VRR:      { label: 'VRR — Virtual Round Robin',            quantum: true,  preemptive: false, cpuOnly: true },
     PRIORITY: { label: 'Prioridades',                          quantum: false, preemptive: 'optional' },
-    // Colas multinivel: implementado y testeado, pero OCULTO en la interfaz porque la
-    // práctica de la comisión no lo usa y confunde. Para habilitarlo: hidden: false.
-    MLFQ:     { label: 'Colas multinivel con retroalimentación', quantum: 'queues', preemptive: true, hidden: true },
+    // Las colas multinivel usan el nivel del proceso, que pertenece a la cola de listos:
+    // un recurso no puede degradar a un proceso, por eso son sólo para la CPU.
+    MLFQ:     { label: 'Colas multinivel con retroalimentación', quantum: 'queues', preemptive: true, cpuOnly: true },
   };
 
   var DEFAULT_QUEUES = [{ quantum: 8 }, { quantum: 16 }, { quantum: null }];
@@ -72,12 +75,10 @@
    * saben a qué servidor pertenece la cola, así que sirven para las dos.
    */
 
-  function normalizePolicy(raw, allowQueues) {
+  function normalizePolicy(raw, forCPU) {
     raw = raw || {};
     var alg = ALGORITHMS[raw.algorithm] ? raw.algorithm : 'FIFO';
-    // Las colas multinivel usan el nivel del proceso, que pertenece a la cola de listos:
-    // un recurso no puede degradar a un proceso, así que ahí se ignoran.
-    if (alg === 'MLFQ' && !allowQueues) alg = 'FIFO';
+    if (ALGORITHMS[alg].cpuOnly && !forCPU) alg = 'FIFO';   // multinivel y VRR son de la CPU
     return {
       algorithm: alg,
       quantum: Math.max(1, parseInt(raw.quantum, 10) || 1),
@@ -87,9 +88,12 @@
     };
   }
 
+  // Criterio de selección de la cola. null = se toma el primero (FIFO, RR, VRR).
+  // En multinivel sólo pesa el nivel: dentro de cada cola se respeta el orden de llegada.
   function sortKey(pol, p) {
     if (pol.algorithm === 'SJF' || pol.algorithm === 'SRTF') return [p.remaining, p.arrival, p.pid];
     if (pol.algorithm === 'PRIORITY') return [p.priority, p.arrival, p.pid];
+    if (pol.algorithm === 'MLFQ') return [p.level];
     return null;
   }
 
@@ -102,13 +106,18 @@
   // Índice del próximo proceso a atender, o -1 si la cola está vacía.
   function pickIndex(pol, queue) {
     if (!queue.length) return -1;
-    if (pol.algorithm === 'FIFO' || pol.algorithm === 'RR') return 0;
+    if (!sortKey(pol, queue[0])) return 0;
     var best = 0;
-    for (var i = 1; i < queue.length; i++) {
-      if (pol.algorithm === 'MLFQ') { if (queue[i].level < queue[best].level) best = i; }
-      else if (better(pol, queue[i], queue[best])) best = i;
-    }
+    for (var i = 1; i < queue.length; i++) if (better(pol, queue[i], queue[best])) best = i;
     return best;
+  }
+
+  // La cola tal como se muestra: en el orden en que el planificador la iría tomando
+  // (el apunte, sobre SJF: "los procesos cortos se colocan delante de los largos").
+  function orderedQueue(pol, queue) {
+    var q = queue.slice();
+    if (!q.length || !sortKey(pol, q[0])) return q;
+    return q.sort(function (a, b) { return better(pol, a, b) ? -1 : better(pol, b, a) ? 1 : 0; });
   }
 
   // Sólo se expulsa si el candidato es ESTRICTAMENTE mejor: en empate sigue el que está.
@@ -120,7 +129,7 @@
   }
 
   function quantumFor(pol, p) {
-    if (pol.algorithm === 'RR') return pol.quantum;
+    if (pol.algorithm === 'RR' || pol.algorithm === 'VRR') return pol.quantum;
     if (pol.algorithm === 'MLFQ') { var q = pol.queues[p.level].quantum; return q == null ? Infinity : q; }
     return Infinity;
   }
@@ -137,7 +146,7 @@
         bursts: t.bursts, idx: 0, remaining: t.bursts[0].dur,
         // Un proceso usa un solo servidor a la vez (o la CPU, o un recurso), así que el
         // contador de quantum puede ser un único campo del proceso.
-        state: 'new', level: 0, quantumLeft: Infinity, keepQuantum: false,
+        state: 'new', level: 0, quantumLeft: Infinity, keepQuantum: false, auxQuantum: 0,
         finish: null,
         tcpu: t.bursts.reduce(function (s, b) { return s + (b.type === 'cpu' ? b.dur : 0); }, 0),
         timeline: [],
@@ -145,17 +154,19 @@
     });
 
     function makeServer(name, pol, isCPU) {
-      return { name: name, pol: pol, isCPU: !!isCPU, queue: [], busy: null, preempted: null, timeline: [], queueTimeline: [] };
+      return { name: name, pol: pol, isCPU: !!isCPU, queue: [], aux: [], busy: null, preempted: null,
+               timeline: [], queueTimeline: [], auxTimeline: [] };
     }
 
-    var cpu = makeServer('CPU', normalizePolicy(cfg, true), true);
+    var cpu = makeServer('CPU', normalizePolicy(cfg, true), true);   // true: acepta VRR y multinivel
     var resources = {};
     def.resources.forEach(function (r) { resources[r] = makeServer(r, normalizePolicy(resCfg[r], false)); });
     var resourceList = Object.keys(resources).map(function (k) { return resources[k]; });
 
     var pendingReady = [];     // terminaron E/S al final del instante anterior
     var pendingIO = [];        // terminaron CPU y piden E/S
-    var readyTimeline = [];    // quiénes esperan la CPU en cada instante, en orden de cola
+    var readyTimeline = [];    // quiénes esperan la CPU en cada instante, en orden de selección
+    var auxTimeline = [];      // cola auxiliar de VRR
     var events = [];
     function log(t, msg) { events.push({ t: t, msg: msg }); }
 
@@ -166,7 +177,11 @@
       if (server.preempted && server.pol.preemptedOrder === 'tiebreak') { incoming.push(server.preempted); server.preempted = null; }
       incoming.sort(byArrivalPid);
       if (server.preempted && server.pol.preemptedOrder === 'first') { server.queue.push(server.preempted); server.preempted = null; }
-      server.queue = server.queue.concat(incoming);
+      incoming.forEach(function (p) {
+        // VRR: el que vuelve de E/S con quantum sin usar espera en la cola auxiliar
+        if (server.pol.algorithm === 'VRR' && p.auxQuantum > 0) server.aux.push(p);
+        else server.queue.push(p);
+      });
       if (server.preempted) { server.queue.push(server.preempted); server.preempted = null; }
     }
 
@@ -182,16 +197,21 @@
         }
       }
       if (server.busy) return;
-      var di = pickIndex(server.pol, server.queue);
+      // VRR: la cola auxiliar se atiende antes que la común
+      var fromAux = server.pol.algorithm === 'VRR' && server.aux.length > 0;
+      var queue = fromAux ? server.aux : server.queue;
+      var di = fromAux ? 0 : pickIndex(server.pol, server.queue);
       if (di < 0) return;
-      var p = server.queue.splice(di, 1)[0];
+      var p = queue.splice(di, 1)[0];
       server.busy = p;
       p.state = server.isCPU ? 'running' : 'io';
-      if (!p.keepQuantum) p.quantumLeft = quantumFor(server.pol, p);
-      p.keepQuantum = false;
+      if (p.keepQuantum) p.keepQuantum = false;
+      else if (fromAux) { p.quantumLeft = p.auxQuantum; p.auxQuantum = 0; }   // sólo lo que le había sobrado
+      else p.quantumLeft = quantumFor(server.pol, p);
       var counter = isFinite(p.quantumLeft) ? ' [contador=' + p.quantumLeft + ']' : '';
       log(t, server.isCPU
-        ? 'Tarea ' + p.name + ' toma la CPU' + (server.pol.algorithm === 'MLFQ' ? ' (Q' + p.level + ')' : '') + counter
+        ? 'Tarea ' + p.name + ' toma la CPU' + (server.pol.algorithm === 'MLFQ' ? ' (Q' + p.level + ')' : '')
+            + (fromAux ? ' desde la cola auxiliar' : '') + counter
         : 'Tarea ' + p.name + ' inicia E/S en ' + server.name + counter);
     }
 
@@ -200,6 +220,12 @@
       if (!p) return;
       p.remaining--;
       if (p.remaining === 0) {
+        var next = p.bursts[p.idx + 1];
+        if (server.isCPU && server.pol.algorithm === 'VRR' && isFinite(p.quantumLeft) && next && next.type === 'io') {
+          // se va a E/S sin agotar el quantum: se guarda el resto para cuando vuelva
+          p.auxQuantum = Math.max(0, p.quantumLeft - 1);
+          if (p.auxQuantum) log(t + 1, 'Tarea ' + p.name + ' deja ' + p.auxQuantum + ' de quantum sin usar');
+        }
         if (!server.isCPU) log(t + 1, 'Tarea ' + p.name + ' termina E/S en ' + server.name);
         advance(p, t + 1);
         server.busy = null;
@@ -264,10 +290,11 @@
       // 4) Registro del instante t.
       procs.forEach(function (p) { p.timeline[t] = snapshot(p); });
       cpu.timeline[t] = cpu.busy ? cpu.busy.pid : null;
-      readyTimeline[t] = cpu.queue.map(function (p) { return p.pid; });
+      readyTimeline[t] = orderedQueue(cpu.pol, cpu.queue).map(function (p) { return p.pid; });
+      auxTimeline[t] = cpu.aux.map(function (p) { return p.pid; });
       resourceList.forEach(function (r) {
         r.timeline[t] = r.busy ? r.busy.pid : null;
-        r.queueTimeline[t] = r.queue.map(function (p) { return p.pid; });
+        r.queueTimeline[t] = orderedQueue(r.pol, r.queue).map(function (p) { return p.pid; });
       });
 
       // 5) Ejecución del instante y transiciones al final del mismo.
@@ -293,6 +320,7 @@
       }),
       cpuTimeline: cpu.timeline,
       readyTimeline: readyTimeline,
+      auxTimeline: auxTimeline,
       totalTime: t,
       events: events,
       metrics: {

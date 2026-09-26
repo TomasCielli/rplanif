@@ -39,9 +39,14 @@ internet: no usa ninguna librería externa y todo lo que cargues queda en tu nav
    - `[k,n]` E/S de *n* instantes en el *k*-ésimo recurso declarado (también vale `[R1,n]`).
    - `#` comentario. `PRIORIDAD` e `INICIO` valen 0 si no se indican.
 
-2. **Algoritmo**: FIFO, SJF, SRTF, Round Robin (quantum) o Prioridades (apropiativo o
-   no). Las colas multinivel están implementadas pero ocultas porque la práctica de la
-   comisión no las usa (`ALGORITHMS.MLFQ.hidden` en `js/scheduler.js`).
+2. **Algoritmo**: FIFO, SJF, SRTF, Round Robin, **VRR**, Prioridades (apropiativo o no)
+   o **colas multinivel** con retroalimentación (quantum por cola, `-` = FCFS).
+
+   - **VRR** (Virtual Round Robin) es RR con una *cola auxiliar*: el proceso que vuelve
+     de una E/S entra antes que los demás, pero sólo por lo que le había sobrado del
+     quantum en su ráfaga anterior. El panel de colas muestra esa auxiliar aparte.
+   - **Multinivel** y **VRR** son sólo para la CPU: un recurso no puede degradar procesos
+     ni tiene "vuelta de E/S".
 
    Cada **recurso de E/S tiene su propia cola y su propio algoritmo** — el apunte lo dice
    así: *un scheduler por cada cola*. Debajo de la política de CPU aparece una fila por
@@ -125,8 +130,10 @@ en `js/scheduler.js`.
 - **Prioridades**: menor valor = mayor prioridad.
 - Los apropiativos (SRTF, Prioridades apropiativo) sólo expulsan si el
   candidato es *estrictamente* mejor; en empate sigue el que está.
+- La cola se muestra **en el orden en que la tomaría el planificador** (con SJF los cortos
+  van adelante, con multinivel manda el nivel), tal como la describe el apunte.
 - Cada proceso puede tener **un solo ▲ y un solo ▼**: al poner uno nuevo se mueve el anterior.
-- **Multinivel** (oculto en la interfaz): los procesos entran en Q0; al agotar el quantum bajan una cola; una
+- **Multinivel**: los procesos entran en Q0; al agotar el quantum bajan una cola; una
   cola superior expulsa a una inferior (el expulsado conserva su quantum restante).
 - T<sub>R</sub> = fin − llegada · T<sub>E</sub> = T<sub>R</sub> − T<sub>CPU</sub> · TPR / TPE = promedios.
 

@@ -371,6 +371,53 @@ TAREA ''2'' INICIO=0 [CPU,10]
   assert.equal(cpuString(res), '122122222222');
 });
 
+// VRR (Virtual Round Robin): igual que RR, pero el que vuelve de una E/S entra en una
+// cola auxiliar que tiene prioridad, y se lleva sólo lo que le había sobrado del quantum.
+const VRR_CASO = `
+RECURSO ''R1''
+TAREA ''1'' INICIO=0 [CPU,3] [R1,2] [CPU,3]
+TAREA ''2'' INICIO=0 [CPU,6]
+`;
+
+test('RR q=4: el que vuelve de E/S espera su turno y se lleva un quantum entero', () => {
+  const res = run(VRR_CASO, { algorithm: 'RR', quantum: 4 });
+  assert.equal(cpuString(res), '111222211122');
+});
+
+test('VRR q=4: la cola auxiliar tiene prioridad y da sólo el resto del quantum', () => {
+  const res = run(VRR_CASO, { algorithm: 'VRR', quantum: 4 });
+  // P1 usa 3 de su quantum de 4 y se va a E/S: le sobra 1. Vuelve en t=5 a la cola
+  // auxiliar y en t=7, apenas se libera la CPU, entra antes que P2 pero por 1 instante.
+  assert.equal(cpuString(res), '111222212211');
+  assert.deepEqual(res.auxTimeline[6], [1]);     // esperando en la auxiliar
+  assert.deepEqual(res.auxTimeline[7], []);      // ya entró a la CPU
+  assert.deepEqual(res.readyTimeline[7], [2]);   // P2 sigue en la cola común
+});
+
+test('VRR: si consumió todo el quantum antes de la E/S, no hay sobrante ni cola auxiliar', () => {
+  const src = `
+RECURSO ''R1''
+TAREA ''1'' INICIO=0 [CPU,4] [R1,2] [CPU,2]
+TAREA ''2'' INICIO=0 [CPU,6]
+`;
+  const res = run(src, { algorithm: 'VRR', quantum: 4 });
+  assert.deepEqual(res.auxTimeline[6], []);      // volvió de E/S a la cola común
+  assert.equal(cpuString(res), '111122221122');
+});
+
+test('la cola se muestra en el orden en que la tomaría el planificador', () => {
+  // El apunte (SJF): "procesos cortos se colocan delante de procesos largos"
+  const src = `
+TAREA ''1'' INICIO=0 [CPU,4]
+TAREA ''2'' INICIO=1 [CPU,9]
+TAREA ''3'' INICIO=2 [CPU,2]
+`;
+  const fifo = run(src, { algorithm: 'FIFO' });
+  assert.deepEqual(fifo.readyTimeline[3], [2, 3]);   // orden de llegada
+  const sjf = run(src, { algorithm: 'SJF' });
+  assert.deepEqual(sjf.readyTimeline[3], [3, 2]);    // el más corto adelante
+});
+
 test('MLFQ: Q0 RR q=2, Q1 RR q=4, Q2 FCFS; baja de cola al agotar quantum', () => {
   const src = `
 TAREA ''1'' INICIO=0 [CPU,10]
